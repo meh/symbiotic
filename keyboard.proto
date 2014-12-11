@@ -1,0 +1,9 @@
+package symbiote.protocol.keyboard;
+
+message Press {
+	required uint32 key;
+}
+
+message Release {
+	required uint32 key;
+}

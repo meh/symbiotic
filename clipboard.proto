@@ -1,0 +1,6 @@
+package symbiotic.protocol.clipboard;
+
+message Change {
+	required string type = 1;
+	required bytes  data = 2;
+}
