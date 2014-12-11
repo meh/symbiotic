@@ -1,12 +1,12 @@
 package symbiotic.protocol.handshake;
 
-message Identity {
-	message Version {
-		required uint32 major = 1;
-		required uint32 minor = 2;
-		required uint32 patch = 3;
-	}
+message Version {
+	required uint32 major = 1;
+	required uint32 minor = 2;
+	required uint32 patch = 3;
+}
 
+message Identity {
 	required string  name    = 1;
 	required Version version = 2;
 }
