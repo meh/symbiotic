@@ -1,0 +1,32 @@
+[root]
+name = "symbiotic-clipboard"
+version = "0.1.0"
+dependencies = [
+ "docopt_macros 0.6.13 (git+https://github.com/docopt/docopt.rs.git)",
+ "protobuf 0.0.8 (git+https://github.com/stepancheg/rust-protobuf.git)",
+ "toml 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "docopt"
+version = "0.6.13"
+source = "git+https://github.com/docopt/docopt.rs.git#38cc4572bef4dc5cbcb7526500aa14d1898c426d"
+
+[[package]]
+name = "docopt_macros"
+version = "0.6.13"
+source = "git+https://github.com/docopt/docopt.rs.git#38cc4572bef4dc5cbcb7526500aa14d1898c426d"
+dependencies = [
+ "docopt 0.6.13 (git+https://github.com/docopt/docopt.rs.git)",
+]
+
+[[package]]
+name = "protobuf"
+version = "0.0.8"
+source = "git+https://github.com/stepancheg/rust-protobuf.git#0d2cb43fe61d7ae030b90256d1713f68233618a0"
+
+[[package]]
+name = "toml"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
