@@ -28,7 +28,6 @@ use std::io::File;
 
 mod connection;
 mod platform;
-mod clipboard;
 
 docopt!(Args deriving Show, "
 Usage: symbiotic-clipboard (-c PATH | --config PATH)
@@ -82,5 +81,5 @@ fn main() {
 	}
 
 	let manager   = connection::Manager::new(port, hosts);
-	/*let clipboard = platform::Clipboard::new();*/
+	let clipboard = platform::Clipboard::new(specs);
 }

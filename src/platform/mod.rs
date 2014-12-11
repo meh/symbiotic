@@ -16,7 +16,13 @@
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(target_os = "linux")]
-pub mod linux;
+pub use self::linux::Clipboard;
 
 #[cfg(target_os = "windows")]
-pub mod windows;
+pub use self::windows::Clipboard;
+
+#[cfg(target_os = "linux")]
+mod linux;
+
+#[cfg(target_os = "windows")]
+mod windows;
