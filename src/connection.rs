@@ -15,8 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-extern crate toml;
-
 use std::io::TcpListener;
 use std::io::TcpStream;
 
