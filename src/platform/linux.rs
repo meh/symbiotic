@@ -17,7 +17,13 @@
 
 extern crate toml;
 
-use std::ptr;
+use std::io::timer::sleep;
+use std::time::duration::Duration;
+
+use std::hash;
+use std::hash::Hash;
+
+use clipboard;
 
 #[allow(non_camel_case_types)]
 mod x11 {
@@ -25,10 +31,11 @@ mod x11 {
 
 	use self::libc::{c_void, c_int, c_uint, c_ulong, c_long};
 	use std::ops::Drop;
+	use std::ptr;
 
 	pub type Id = c_ulong;
 
-	static PROPERTY_CHANGE_MASK: c_long = 1 << 22;
+	pub static PROPERTY_CHANGE_MASK: c_long = 1 << 22;
 
 	#[link(name = "X11")]
 	extern "system" {
@@ -40,6 +47,8 @@ mod x11 {
 		fn XCreateSimpleWindow(display: *mut c_void, parent: Id,
 		                       x: c_int, y: c_int, width: c_uint, height: c_uint,
 		                       border_width: c_uint, border: Id, background: Id) -> Id;
+
+		fn XSelectInput(display: *mut c_void, window: Id, mask: c_long) -> c_int;
 	}
 
 	pub struct Display {
@@ -51,19 +60,28 @@ mod x11 {
 	}
 
 	impl Display {
-		pub fn open(name: &str) -> Option<Box<Display>> {
-			let pointer = unsafe { XOpenDisplay(name.to_c_str().as_ptr()) };
+		pub fn open(name: Option<&String>) -> Option<Display> {
+			let pointer = match name {
+				Some(name) => unsafe { XOpenDisplay(name.to_c_str().as_ptr()) },
+				None       => unsafe { XOpenDisplay(ptr::null()) }
+			};
 
 			if pointer.is_null() {
 				None
 			}
 			else {
-				Some(box Display { pointer: pointer })
+				Some(Display { pointer: pointer })
 			}
 		}
 
-		pub fn root(&self) -> Box<Window> {
-			box Window { id: unsafe { XDefaultRootWindow(self.pointer) } }
+		pub fn root(&self) -> Window {
+			Window { id: unsafe { XDefaultRootWindow(self.pointer) } }
+		}
+
+		pub fn select(&self, window: &Window, mask: c_long) {
+			unsafe {
+				XSelectInput(self.pointer, window.id, mask);
+			}
 		}
 	}
 
@@ -76,53 +94,63 @@ mod x11 {
 	}
 
 	impl Window {
-		pub fn open(display: &Box<Display>, parent: &Box<Window>,
+		pub fn open(display: &Display, parent: &Window,
 		            position: (i32, i32), size: (u32, u32),
-		            border: (u32, Id), background: Id) -> Box<Window> {
+		            border: (u32, Id), background: Id) -> Window {
 			let (x, y)                    = position;
 			let (width, height)           = size;
 			let (border_width, border_id) = border;
 
-			box Window {
+			Window {
 				id: unsafe { XCreateSimpleWindow(display.pointer, parent.id,
-			                                   x, y, width, height,
-			                                   border_width, border_id, background) } }
+				                                 x, y, width, height,
+				                                 border_width, border_id, background) } }
 		}
 	}
 }
 
 pub struct Clipboard {
-	display: Box<x11::Display>,
-	window:  Box<x11::Window>,
+	display: Option<String>,
+	channel: Option<Sender<clipboard::Change>>,
 }
 
 impl Clipboard {
 	pub fn new(specs: Option<toml::Value>) -> Clipboard {
-		let mut name = "";
+		let mut name = None;
 
 		if specs.is_some() {
 			let table = specs.unwrap();
 
 			if table.lookup("display").is_some() {
-				name = table.lookup("display").unwrap().as_str().unwrap().clone();
+				name = Some(table.lookup("display").unwrap().as_str().unwrap().to_string());
 			}
 		}
 
-		let display = x11::Display::open(name).unwrap();
+		Clipboard { display: name, channel: None }
+	}
+}
+
+impl clipboard::Clipboard for Clipboard {
+	fn start(&mut self, function: |clipboard::Change| -> ()) {
+		let display = x11::Display::open(self.display.as_ref()).unwrap();
 		let window  = x11::Window::open(&display, &display.root(), (0, 0), (1, 1), (0, 0), 0);
 
-		Clipboard { display: display, window: window }
+		display.select(&window, x11::PROPERTY_CHANGE_MASK);
+
+		let (sender, receiver): (Sender<clipboard::Change>, Receiver<clipboard::Change>) = channel();
+
+		spawn(proc() {
+			loop {
+				sleep(Duration::seconds(1));
+
+				println!("hue");
+			}
+		});
+
+		self.channel = Some(sender);
 	}
 
-	fn get(&self) -> (&str, &[u8]) {
-		("text/plain", [].as_slice())
-	}
-
-	fn set(&self, desc: (&str, &[u8])) {
-
-	}
-
-	fn observe(&self, func: |(&str, &[u8])| -> ()) {
-
+	fn set(&mut self, value: clipboard::Change) {
+		self.channel.as_ref().unwrap().send(value.clone());
 	}
 }
