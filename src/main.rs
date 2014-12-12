@@ -82,6 +82,14 @@ fn main() {
 		}
 	}
 
-	let manager   = connection::Manager::new(port, hosts);
-	let clipboard = platform::Clipboard::new(specs);
+	let mut manager   = connection::Manager::new(port, hosts);
+	let mut clipboard = platform::Clipboard::new(specs);
+	
+	clipboard.start(|change| {
+		manager.change(change);
+	});
+
+	manager.start(|change| {
+		clipboard.set(change);
+	});
 }
