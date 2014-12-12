@@ -25,9 +25,11 @@ extern crate docopt;
 #[phase(plugin)] extern crate docopt_macros;
 
 use std::io::File;
+use clipboard::Clipboard;
 
 mod connection;
 mod platform;
+mod clipboard;
 
 docopt!(Args deriving Show, "
 Usage: symbiotic-clipboard (-c PATH | --config PATH)
