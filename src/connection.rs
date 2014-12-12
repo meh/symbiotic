@@ -15,23 +15,53 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::TcpListener;
-use std::io::TcpStream;
+extern crate openssl;
+/*extern crate protobuf;*/
+
+use std::io::{TcpListener, TcpStream};
+use std::io::{Acceptor, Listener};
+
+/*use protobuf::stream::{CodedInputStream, CodedOutputStream};*/
+
+use self::openssl::ssl::SslMethod::Sslv23;
+use self::openssl::ssl::{SslContext, SslStream};
+use self::openssl::ssl::SslVerifyMode::SslVerifyPeer;
 
 use clipboard::Change;
 
 pub struct Manager {
+	bind:  String,
 	port:  u16,
 	hosts: Vec<String>,
 }
 
 impl Manager {
-	pub fn new(port: u16, hosts: Vec<String>) -> Manager {
-		Manager { port: port, hosts: hosts }
+	pub fn new(bind: String, port: u16, hosts: Vec<String>) -> Manager {
+		Manager { bind: bind, port: port, hosts: hosts }
 	}
 
-	pub fn start(&self, function: |Change| -> ()) {
-		println!("{} {}", self.port, self.hosts);
+	pub fn start(&mut self, function: |Change| -> ()) {
+		let mut listener = TcpListener::bind((self.bind.as_slice(), self.port));
+		let mut acceptor = listener.listen();
+
+		for host in self.hosts.iter().map(|h| h.clone()) {
+			spawn(proc() {
+				loop {
+					let mut conn   = TcpStream::connect(host.as_slice());
+					/*let mut stream = CodedInputStream::new(conn);*/
+				}
+			});
+		}
+
+		for stream in acceptor.incoming() {
+			match stream {
+				Err(e) => {},
+
+				Ok(stream) => spawn(proc() {
+
+				})
+			}
+		}
 	}
 
 	pub fn change(&self, change: Change) {

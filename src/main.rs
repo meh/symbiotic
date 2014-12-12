@@ -38,12 +38,15 @@ Usage: symbiotic-clipboard (-c PATH | --config PATH)
 
 Options:
   -h, --help         Show this message.
-  -p, --port PORT    Port to listen on.
+  -b, --bind IP      IP to bind on (default 0.0.0.0).
+  -p, --port PORT    Port to listen on (default 23421).
   -c, --config PATH  Path to the config file.
-", flag_port: Option<u16>, flag_config: Option<String>, arg_hosts: Option<Vec<String>>)
+", flag_bind: Option<String>, flag_port: Option<u16>, flag_config: Option<String>,
+   arg_hosts: Option<Vec<String>>)
 
 fn main() {
 	let hosts: Vec<String>;
+	let bind:  String;
 	let port:  u16;
 	let specs: Option<toml::Value>;
 
@@ -72,17 +75,23 @@ fn main() {
 				None    => 23421
 			};
 
+			bind = match config.get("bind") {
+				Some(b) => b.as_str().unwrap().to_string(),
+				None    => "0.0.0.0".to_string()
+			};
+
 			specs = config.get("platform").map(|p| p.clone());
 		}
 
 		None => {
 			hosts = args.arg_hosts.unwrap_or(vec!());
 			port  = args.flag_port.unwrap_or(23421);
+			bind  = args.flag_bind.unwrap_or("0.0.0.0".to_string());
 			specs = None;
 		}
 	}
 
-	let mut manager   = connection::Manager::new(port, hosts);
+	let mut manager   = connection::Manager::new(bind, port, hosts);
 	let mut clipboard = platform::Clipboard::new(specs);
 	
 	clipboard.start(|change| {
