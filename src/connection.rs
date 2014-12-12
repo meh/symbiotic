@@ -18,6 +18,8 @@
 use std::io::TcpListener;
 use std::io::TcpStream;
 
+use clipboard::Change;
+
 pub struct Manager {
 	port:  u16,
 	hosts: Vec<String>,
@@ -28,7 +30,11 @@ impl Manager {
 		Manager { port: port, hosts: hosts }
 	}
 
-	pub fn start(&self) {
+	pub fn start(&self, function: |Change| -> ()) {
 		println!("{} {}", self.port, self.hosts);
+	}
+
+	pub fn change(&self, change: Change) {
+
 	}
 }
