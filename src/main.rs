@@ -15,17 +15,23 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-#![feature(phase)]
+#![feature(phase, unboxed_closures)]
+
+// XXX: remove me when done prototyping
+#![allow(dead_code, unused_variables, unused_imports)]
 
 extern crate serialize;
 
 extern crate toml;
 
 extern crate docopt;
-#[phase(plugin)] extern crate docopt_macros;
+#[phase(plugin)]
+extern crate docopt_macros;
 
 use std::io::File;
 use clipboard::Clipboard;
+
+use std::rc::Rc;
 
 mod connection;
 mod platform;
@@ -94,11 +100,11 @@ fn main() {
 	let mut manager   = connection::Manager::new(bind, port, hosts);
 	let mut clipboard = platform::Clipboard::new(specs);
 	
-	clipboard.start(|change| {
+	clipboard.start(move |change| {
 		manager.change(change);
 	});
 
-	manager.start(|change| {
+	manager.start(move |change| {
 		clipboard.set(change);
 	});
 }

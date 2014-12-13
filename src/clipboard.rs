@@ -16,10 +16,12 @@
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
 use std::sync::Arc;
+use std::ops::Fn;
 
 pub type Change = Arc<(String, Vec<u8>)>;
 
 pub trait Clipboard {
-	fn start(&mut self, function: |Change| -> ());
+	fn start<F>(&mut self, function: F) where F: Fn(Change) + Send;
+
 	fn set(&mut self, value: Change);
 }

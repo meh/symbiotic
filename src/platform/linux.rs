@@ -260,7 +260,7 @@ impl Clipboard {
 }
 
 impl clipboard::Clipboard for Clipboard {
-	fn start(&mut self, function: |clipboard::Change| -> ()) {
+	fn start<F>(&mut self, function: F) where F: Fn(Change) + Send {
 		let config    = self.config.clone();
 		let display   = x11::Display::open(config.display.as_ref()).unwrap();
 		let window    = x11::Window::open(&display, &display.root(), (0, 0), (1, 1), (0, 0), 0);

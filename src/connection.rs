@@ -40,7 +40,7 @@ impl Manager {
 		Manager { bind: bind, port: port, hosts: hosts }
 	}
 
-	pub fn start(&mut self, function: |Change| -> ()) {
+	pub fn start<F>(&mut self, function: F) where F: Fn(Change) + Send {
 		let mut listener = TcpListener::bind((self.bind.as_slice(), self.port));
 		let mut acceptor = listener.listen();
 
