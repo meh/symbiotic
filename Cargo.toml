@@ -7,7 +7,7 @@ authors = ["meh. <meh@schizofreni.co>"]
 #git = "https://github.com/stepancheg/rust-protobuf.git"
 
 [dependencies.docopt_macros]
-git = "https://github.com/docopt/docopt.rs.git"
+docopt = "0.6.14"
 
 [dependencies.toml]
 toml = "0.1.4"
