@@ -16,7 +16,6 @@
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
 use std::sync::Arc;
-use std::ops::Fn;
 
 pub type Change = Arc<(String, Vec<u8>)>;
 
