@@ -30,9 +30,9 @@ impl Version {
         unsafe {
             instance.get(|| {
                 Version {
-                    major: ::std::option::None,
-                    minor: ::std::option::None,
-                    patch: ::std::option::None,
+                    major: ::std::option::Option::None,
+                    minor: ::std::option::Option::None,
+                    patch: ::std::option::Option::None,
                     unknown_fields: ::protobuf::UnknownFields::new(),
                     cached_size: ::std::cell::Cell::new(0),
                 }
@@ -43,7 +43,7 @@ impl Version {
     // required uint32 major = 1;
 
     pub fn clear_major(&mut self) {
-        self.major = ::std::option::None;
+        self.major = ::std::option::Option::None;
     }
 
     pub fn has_major(&self) -> bool {
@@ -52,7 +52,7 @@ impl Version {
 
     // Param is passed by value, moved
     pub fn set_major(&mut self, v: u32) {
-        self.major = ::std::option::Some(v);
+        self.major = ::std::option::Option::Some(v);
     }
 
     pub fn get_major<'a>(&self) -> u32 {
@@ -62,7 +62,7 @@ impl Version {
     // required uint32 minor = 2;
 
     pub fn clear_minor(&mut self) {
-        self.minor = ::std::option::None;
+        self.minor = ::std::option::Option::None;
     }
 
     pub fn has_minor(&self) -> bool {
@@ -71,7 +71,7 @@ impl Version {
 
     // Param is passed by value, moved
     pub fn set_minor(&mut self, v: u32) {
-        self.minor = ::std::option::Some(v);
+        self.minor = ::std::option::Option::Some(v);
     }
 
     pub fn get_minor<'a>(&self) -> u32 {
@@ -81,7 +81,7 @@ impl Version {
     // required uint32 patch = 3;
 
     pub fn clear_patch(&mut self) {
-        self.patch = ::std::option::None;
+        self.patch = ::std::option::Option::None;
     }
 
     pub fn has_patch(&self) -> bool {
@@ -90,7 +90,7 @@ impl Version {
 
     // Param is passed by value, moved
     pub fn set_patch(&mut self, v: u32) {
-        self.patch = ::std::option::Some(v);
+        self.patch = ::std::option::Option::Some(v);
     }
 
     pub fn get_patch<'a>(&self) -> u32 {
@@ -122,24 +122,24 @@ impl ::protobuf::Message for Version {
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
+                        return ::std::result::Result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
                     };
                     let tmp = try!(is.read_uint32());
-                    self.major = ::std::option::Some(tmp);
+                    self.major = ::std::option::Option::Some(tmp);
                 },
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
+                        return ::std::result::Result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
                     };
                     let tmp = try!(is.read_uint32());
-                    self.minor = ::std::option::Some(tmp);
+                    self.minor = ::std::option::Option::Some(tmp);
                 },
                 3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
+                        return ::std::result::Result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
                     };
                     let tmp = try!(is.read_uint32());
-                    self.patch = ::std::option::Some(tmp);
+                    self.patch = ::std::option::Option::Some(tmp);
                 },
                 _ => {
                     let unknown = try!(is.read_unknown(wire_type));
@@ -147,7 +147,7 @@ impl ::protobuf::Message for Version {
                 },
             };
         }
-        ::std::result::Ok(())
+        ::std::result::Result::Ok(())
     }
 
     // Compute sizes of nested messages
@@ -178,7 +178,7 @@ impl ::protobuf::Message for Version {
             try!(os.write_uint32(3, v));
         };
         try!(os.write_unknown_fields(self.get_unknown_fields()));
-        ::std::result::Ok(())
+        ::std::result::Result::Ok(())
     }
 
     fn get_cached_size(&self) -> u32 {
@@ -376,14 +376,14 @@ impl ::protobuf::Message for Identity {
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
+                        return ::std::result::Result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
                     };
                     let tmp = self.name.set_default();
                     try!(is.read_string_into(tmp))
                 },
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
+                        return ::std::result::Result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
                     };
                     let tmp = self.version.set_default();
                     try!(is.merge_message(tmp))
@@ -394,7 +394,7 @@ impl ::protobuf::Message for Identity {
                 },
             };
         }
-        ::std::result::Ok(())
+        ::std::result::Result::Ok(())
     }
 
     // Compute sizes of nested messages
@@ -422,7 +422,7 @@ impl ::protobuf::Message for Identity {
             try!(v.write_to_with_cached_sizes(os));
         };
         try!(os.write_unknown_fields(self.get_unknown_fields()));
-        ::std::result::Ok(())
+        ::std::result::Result::Ok(())
     }
 
     fn get_cached_size(&self) -> u32 {
