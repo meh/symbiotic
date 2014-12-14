@@ -21,11 +21,6 @@ extern crate protobuf;
 use std::io::{TcpListener, TcpStream};
 use std::io::{Acceptor, Listener};
 
-use std::io::timer::sleep;
-use std::time::duration::Duration;
-
-use self::protobuf::stream::{CodedInputStream, CodedOutputStream};
-
 use self::openssl::ssl::SslMethod::Sslv23;
 use self::openssl::ssl::{SslContext, SslStream};
 use self::openssl::ssl::SslVerifyMode::SslVerifyPeer;
