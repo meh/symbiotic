@@ -109,11 +109,11 @@ fn main() {
 	loop {
 		match receiver.recv() {
 			Incoming(change) => {
-
+				clipboard.set(change);
 			},
 
 			Outgoing(change) => {
-
+				manager.set(change);
 			}
 		}
 	}
