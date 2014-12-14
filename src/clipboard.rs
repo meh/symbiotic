@@ -20,8 +20,14 @@ use std::ops::Fn;
 
 pub type Change = Arc<(String, Vec<u8>)>;
 
-pub trait Clipboard {
-	fn start<F>(&mut self, function: F) where F: Fn(Change) + Send;
+pub enum Direction<T> {
+	Incoming(T),
+	Outgoing(T),
+}
 
-	fn set(&mut self, value: Change);
+pub type Message = Direction<Change>;
+
+pub trait Clipboard {
+	fn start(&self, channel: Sender<Message>);
+	fn set(&self, value: Change);
 }

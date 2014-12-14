@@ -26,7 +26,8 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use clipboard;
-use clipboard::Change;
+use clipboard::{Message, Change};
+use clipboard::Direction::Outgoing;
 
 #[allow(non_camel_case_types, non_upper_case_globals)]
 mod x11 {
@@ -214,14 +215,9 @@ enum Selection {
 }
 
 #[deriving(Clone, Show)]
-struct Config {
+pub struct Clipboard {
 	display:   Option<String>,
 	selection: Selection,
-}
-
-pub struct Clipboard {
-	config:  Config,
-	channel: Option<Sender<Change>>,
 }
 
 impl Clipboard {
@@ -249,25 +245,19 @@ impl Clipboard {
 		}
 
 		Clipboard {
-			channel: None,
-
-			config: Config {
-				display:   display,
-				selection: selection,
-			}
+			display:   display,
+			selection: selection,
 		}
 	}
 }
 
 impl clipboard::Clipboard for Clipboard {
-	fn start<F>(&mut self, function: F) where F: Fn(Change) + Send {
-		let config    = self.config.clone();
-		let display   = x11::Display::open(config.display.as_ref()).unwrap();
-		let window    = x11::Window::open(&display, &display.root(), (0, 0), (1, 1), (0, 0), 0);
+	fn start(&self, channel: Sender<Message>) {
+		let config  = self.clone();
+		let display = x11::Display::open(config.display.as_ref()).unwrap();
+		let window  = x11::Window::open(&display, &display.root(), (0, 0), (1, 1), (0, 0), 0);
 
 		display.select(&window, x11::PROPERTY_CHANGE_MASK);
-
-		let (sender, receiver): (Sender<Change>, Receiver<Change>) = channel();
 
 		spawn(proc() {
 			enum State {
@@ -288,7 +278,7 @@ impl clipboard::Clipboard for Clipboard {
 					State::None => {
 						match config.selection {
 							Selection::String => {
-								function.call((Arc::new(("text/plain".to_string(), display.fetch_buffer(0))),));
+								channel.send(Outgoing(Arc::new(("text/plain".to_string(), display.fetch_buffer(1)))));
 
 								state = State::Done;
 							},
@@ -303,8 +293,7 @@ impl clipboard::Clipboard for Clipboard {
 
 					},
 
-					State::Incr => {
-
+					State::Incr => { 
 					},
 
 					State::Fallback => {
@@ -319,11 +308,8 @@ impl clipboard::Clipboard for Clipboard {
 				}
 			}
 		});
-
-		self.channel = Some(sender);
 	}
 
-	fn set(&mut self, value: Change) {
-		self.channel.as_ref().unwrap().send(value.clone());
+	fn set(&self, value: Change) {
 	}
 }

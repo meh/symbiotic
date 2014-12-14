@@ -16,55 +16,123 @@
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
 extern crate openssl;
-/*extern crate protobuf;*/
+extern crate protobuf;
 
 use std::io::{TcpListener, TcpStream};
 use std::io::{Acceptor, Listener};
 
-/*use protobuf::stream::{CodedInputStream, CodedOutputStream};*/
+use std::io::timer::sleep;
+use std::time::duration::Duration;
+
+use self::protobuf::stream::{CodedInputStream, CodedOutputStream};
 
 use self::openssl::ssl::SslMethod::Sslv23;
 use self::openssl::ssl::{SslContext, SslStream};
 use self::openssl::ssl::SslVerifyMode::SslVerifyPeer;
 
-use clipboard::Change;
+use clipboard;
+use clipboard::Direction::Incoming;
 
+use protocol;
+
+use self::protobuf::Message;
+use self::protobuf::stream::{WithCodedInputStream, WithCodedOutputStream};
+
+#[deriving(Clone)]
 pub struct Manager {
 	bind:  String,
 	port:  u16,
-	hosts: Vec<String>,
+	peers: Vec<String>,
+
+	broadcast: Option<Vec<Sender<clipboard::Change>>>,
 }
 
 impl Manager {
-	pub fn new(bind: String, port: u16, hosts: Vec<String>) -> Manager {
-		Manager { bind: bind, port: port, hosts: hosts }
+	pub fn new(bind: String, port: u16, peers: Vec<String>) -> Manager {
+		Manager { bind: bind, port: port, peers: peers, broadcast: None }
 	}
 
-	pub fn start<F>(&mut self, function: F) where F: Fn(Change) + Send {
-		let mut listener = TcpListener::bind((self.bind.as_slice(), self.port));
-		let mut acceptor = listener.listen();
+	pub fn start(&mut self, ipc: Sender<clipboard::Message>) {
+		self.broadcast = Some(self.peers.iter().map(|h| {
+			let (sender, receiver) = channel();
+			let host               = h.clone();
 
-		for host in self.hosts.iter().map(|h| h.clone()) {
 			spawn(proc() {
 				loop {
-					let mut conn   = TcpStream::connect(host.as_slice());
-					/*let mut stream = CodedInputStream::new(conn);*/
+					let mut conn = match TcpStream::connect(host.as_slice()) {
+						Ok(conn) => conn,
+						Err(_)   => continue
+					};
+
+					{
+						let mut msg = protocol::handshake::Identity::new();
+
+						msg.set_name("clipboard".to_string());
+
+						msg.mut_version().set_major(from_str(env!("CARGO_PKG_VERSION_MAJOR")).unwrap());
+						msg.mut_version().set_minor(from_str(env!("CARGO_PKG_VERSION_MINOR")).unwrap());
+						msg.mut_version().set_patch(from_str(env!("CARGO_PKG_VERSION_PATCH")).unwrap());
+
+						if msg.write_to_writer(&mut conn).is_err() {
+							continue;
+						}
+					}
+
+					match protobuf::parse_from_reader::<protocol::handshake::Identity>(&mut conn) {
+						Ok(msg) => {
+							if msg.get_name().as_slice() != "clipboard" {
+								continue;
+							}
+
+							if msg.get_version().get_major() != from_str(env!("CARGO_PKG_VERSION_MAJOR")).unwrap() {
+								continue;
+							}
+
+							if msg.get_version().get_minor() != from_str(env!("CARGO_PKG_VERSION_MINOR")).unwrap() {
+								continue;
+							}
+
+							if msg.get_version().get_patch() > from_str(env!("CARGO_PKG_VERSION_MINOR")).unwrap() {
+								continue;
+							}
+						},
+
+						Err(_) => continue
+					}
+
+					loop {
+						let     (format, data) = receiver.recv();
+						let mut msg            = protocol::clipboard::Change::new();
+					}
 				}
 			});
-		}
 
-		for stream in acceptor.incoming() {
-			match stream {
-				Err(e) => {},
+			sender
+		}).collect());
 
-				Ok(stream) => spawn(proc() {
 
-				})
+		let bind = self.bind.clone();
+		let port = self.port.clone();
+
+		spawn(proc() {
+			let mut listener = TcpListener::bind((bind.as_slice(), port));
+			let mut acceptor = listener.listen();
+
+			for stream in acceptor.incoming() {
+				match stream {
+					Err(e) => {},
+
+					Ok(stream) => spawn(proc() {
+
+					})
+				}
 			}
-		}
+		});
 	}
 
-	pub fn change(&self, change: Change) {
-
+	pub fn set(&self, change: clipboard::Change) {
+		for sender in self.broadcast.as_ref().unwrap().iter() {
+			sender.send(change.clone());
+		}
 	}
 }

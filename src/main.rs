@@ -20,26 +20,27 @@
 // XXX: remove me when done prototyping
 #![allow(dead_code, unused_variables, unused_imports)]
 
+extern crate protobuf;
 extern crate serialize;
-
 extern crate toml;
-
 extern crate docopt;
 #[phase(plugin)]
 extern crate docopt_macros;
 
 use std::io::File;
-use clipboard::Clipboard;
 
-use std::rc::Rc;
+use clipboard::Clipboard;
+use clipboard::{Change, Message};
+use clipboard::Direction::{Incoming, Outgoing};
 
 mod connection;
 mod platform;
 mod clipboard;
+mod protocol;
 
 docopt!(Args deriving Show, "
 Usage: symbiotic-clipboard (-c PATH | --config PATH)
-       symbiotic-clipboard [options] <hosts>...
+       symbiotic-clipboard [options] <peers>...
        symbiotic-clipboard --help
 
 Options:
@@ -48,10 +49,10 @@ Options:
   -p, --port PORT    Port to listen on (default 23421).
   -c, --config PATH  Path to the config file.
 ", flag_bind: Option<String>, flag_port: Option<u16>, flag_config: Option<String>,
-   arg_hosts: Option<Vec<String>>)
+   arg_peers: Option<Vec<String>>)
 
 fn main() {
-	let hosts: Vec<String>;
+	let peers: Vec<String>;
 	let bind:  String;
 	let port:  u16;
 	let specs: Option<toml::Value>;
@@ -68,7 +69,7 @@ fn main() {
 					panic!("{}: file not found", path)
 			};
 
-			hosts = match config.get("hosts") {
+			peers = match config.get("peers") {
 				Some(h) => h.as_slice().unwrap().iter()
 				            .map(|x| x.as_str().unwrap().to_string())
 				            .collect::<Vec<String>>(),
@@ -90,21 +91,30 @@ fn main() {
 		}
 
 		None => {
-			hosts = args.arg_hosts.unwrap_or(vec!());
+			peers = args.arg_peers.unwrap_or(vec!());
 			port  = args.flag_port.unwrap_or(23421);
 			bind  = args.flag_bind.unwrap_or("0.0.0.0".to_string());
 			specs = None;
 		}
 	}
 
-	let mut manager   = connection::Manager::new(bind, port, hosts);
-	let mut clipboard = platform::Clipboard::new(specs);
-	
-	clipboard.start(move |change| {
-		manager.change(change);
-	});
+	let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
 
-	manager.start(move |change| {
-		clipboard.set(change);
-	});
+	let mut manager   = connection::Manager::new(bind, port, peers);
+	let     clipboard = platform::Clipboard::new(specs);
+	
+	clipboard.start(sender.clone());
+	manager.start(sender.clone());
+
+	loop {
+		match receiver.recv() {
+			Incoming(change) => {
+
+			},
+
+			Outgoing(change) => {
+
+			}
+		}
+	}
 }
