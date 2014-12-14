@@ -105,7 +105,6 @@ impl Manager {
 			sender
 		}).collect());
 
-
 		let bind = self.bind.clone();
 		let port = self.port.clone();
 
