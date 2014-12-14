@@ -3,8 +3,8 @@ name    = "symbiotic-clipboard"
 version = "0.1.0"
 authors = ["meh. <meh@schizofreni.co>"]
 
-#[dependencies.protobuf]
-#git = "https://github.com/stepancheg/rust-protobuf.git"
+[dependencies.protobuf]
+git = "https://github.com/stepancheg/rust-protobuf.git"
 
 [dependencies.docopt_macros]
 docopt = "0.6.14"
