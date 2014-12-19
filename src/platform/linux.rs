@@ -252,14 +252,14 @@ impl Clipboard {
 }
 
 impl clipboard::Clipboard for Clipboard {
-	fn start(&self, channel: Sender<Message>) {
+	fn start(&self, ipc: Sender<Message>) {
 		let config  = self.clone();
 		let display = x11::Display::open(config.display.as_ref()).unwrap();
 		let window  = x11::Window::open(&display, &display.root(), (0, 0), (1, 1), (0, 0), 0);
 
 		display.select(&window, x11::PROPERTY_CHANGE_MASK);
 
-		spawn(proc() {
+		spawn(move || {
 			enum State {
 				None,
 				Sent,
@@ -278,7 +278,7 @@ impl clipboard::Clipboard for Clipboard {
 					State::None => {
 						match config.selection {
 							Selection::String => {
-								channel.send(Outgoing(Arc::new(("text/plain".to_string(), display.fetch_buffer(1)))));
+								ipc.send(Outgoing(Arc::new(("text/plain".to_string(), display.fetch_buffer(1)))));
 
 								state = State::Done;
 							},
