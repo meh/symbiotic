@@ -18,6 +18,8 @@
 extern crate openssl;
 extern crate protobuf;
 
+use std::sync::Arc;
+
 use std::io::{TcpListener, TcpStream};
 use std::io::{Acceptor, Listener};
 
@@ -31,7 +33,8 @@ use clipboard::Direction::Incoming;
 use protocol;
 
 use self::protobuf::Message;
-use self::protobuf::stream::{WithCodedInputStream, WithCodedOutputStream};
+use self::protobuf::core::parse_length_delimited_from;
+use self::protobuf::stream::{CodedInputStream, CodedOutputStream};
 
 #[deriving(Clone)]
 pub struct Manager {
@@ -47,57 +50,87 @@ impl Manager {
 		Manager { bind: bind, port: port, peers: peers, broadcast: None }
 	}
 
+	fn verify(msg: &protocol::handshake::Identity) -> bool {
+		if msg.get_name().as_slice() != "clipboard" {
+			return false;
+		}
+
+		if msg.get_version().get_major() != from_str(env!("CARGO_PKG_VERSION_MAJOR")).unwrap() {
+			return false;
+		}
+
+		if msg.get_version().get_minor() != from_str(env!("CARGO_PKG_VERSION_MINOR")).unwrap() {
+			return false;
+		}
+
+		if msg.get_version().get_patch() > from_str(env!("CARGO_PKG_VERSION_MINOR")).unwrap() {
+			return false;
+		}
+
+		true
+	}
+
+	fn identity() -> protocol::handshake::Identity {
+		let mut msg = protocol::handshake::Identity::new();
+
+		msg.set_name("clipboard".to_string());
+
+		msg.mut_version().set_major(from_str(env!("CARGO_PKG_VERSION_MAJOR")).unwrap());
+		msg.mut_version().set_minor(from_str(env!("CARGO_PKG_VERSION_MINOR")).unwrap());
+		msg.mut_version().set_patch(from_str(env!("CARGO_PKG_VERSION_PATCH")).unwrap());
+
+		return msg;
+	}
+
 	pub fn start(&mut self, ipc: Sender<clipboard::Message>) {
 		self.broadcast = Some(self.peers.iter().map(|h| {
-			let (sender, receiver) = channel();
+			let (sender, receiver) = channel::<clipboard::Change>();
 			let host               = h.clone();
 
-			spawn(proc() {
+			spawn(move || {
 				loop {
 					let mut conn = match TcpStream::connect(host.as_slice()) {
-						Ok(conn) => conn,
-						Err(_)   => continue
+						Ok(conn) =>
+							conn,
+
+						Err(_) =>
+							continue
 					};
 
-					{
-						let mut msg = protocol::handshake::Identity::new();
+					println!("client: connected");
 
-						msg.set_name("clipboard".to_string());
+					conn.set_nodelay(true).unwrap();
+					conn.close_read().unwrap();
 
-						msg.mut_version().set_major(from_str(env!("CARGO_PKG_VERSION_MAJOR")).unwrap());
-						msg.mut_version().set_minor(from_str(env!("CARGO_PKG_VERSION_MINOR")).unwrap());
-						msg.mut_version().set_patch(from_str(env!("CARGO_PKG_VERSION_PATCH")).unwrap());
+					let mut output = CodedOutputStream::new(&mut conn);
 
-						if msg.write_to_writer(&mut conn).is_err() {
-							continue;
-						}
+					println!("client: sending handshake");
+
+					if Manager::identity().write_length_delimited_to(&mut output).is_err() {
+						continue;
 					}
 
-					match protobuf::parse_from_reader::<protocol::handshake::Identity>(&mut conn) {
-						Ok(msg) => {
-							if msg.get_name().as_slice() != "clipboard" {
-								continue;
-							}
-
-							if msg.get_version().get_major() != from_str(env!("CARGO_PKG_VERSION_MAJOR")).unwrap() {
-								continue;
-							}
-
-							if msg.get_version().get_minor() != from_str(env!("CARGO_PKG_VERSION_MINOR")).unwrap() {
-								continue;
-							}
-
-							if msg.get_version().get_patch() > from_str(env!("CARGO_PKG_VERSION_MINOR")).unwrap() {
-								continue;
-							}
-						},
-
-						Err(_) => continue
-					}
+					println!("client: sent handshake: {}", Manager::identity());
 
 					loop {
-						let     (format, data) = receiver.recv();
-						let mut msg            = protocol::clipboard::Change::new();
+						println!("client: waiting for message");
+
+						let (ref format, ref data) = *receiver.recv();
+
+						println!("client: message received: {}: {}", format, data);
+
+						{
+							let mut msg = protocol::clipboard::Change::new();
+
+							msg.set_format(format.clone());
+							msg.set_data(data.clone());
+
+							if msg.write_length_delimited_to(&mut output).is_err() {
+								break;
+							}
+						}
+
+						println!("client: message sent");
 					}
 				}
 			});
@@ -108,17 +141,55 @@ impl Manager {
 		let bind = self.bind.clone();
 		let port = self.port.clone();
 
-		spawn(proc() {
-			let mut listener = TcpListener::bind((bind.as_slice(), port));
+		spawn(move || {
+			let     listener = TcpListener::bind((bind.as_slice(), port));
 			let mut acceptor = listener.listen();
 
-			for stream in acceptor.incoming() {
-				match stream {
-					Err(e) => {},
+			for conn in acceptor.incoming() {
+				let ipc = ipc.clone();
 
-					Ok(stream) => spawn(proc() {
+				match conn {
+					Ok(conn) => spawn(move || {
+						let mut conn = conn;
 
-					})
+						println!("server: connected");
+
+						conn.set_nodelay(true).unwrap();
+						conn.close_write().unwrap();
+
+						let mut input = CodedInputStream::new(&mut conn);
+
+						println!("server: fo shizzle");
+
+						match parse_length_delimited_from::<protocol::handshake::Identity>(&mut input) {
+							Ok(msg) => {
+								if !Manager::verify(&msg) {
+									println!("server: handshake invalid");
+
+									return;
+								}
+							},
+
+							Err(error) => {
+								println!("server: handshake error: {}", error);
+								return;
+							}
+						}
+
+						println!("server: handshake verified");
+
+						loop {
+							match parse_length_delimited_from::<protocol::clipboard::Change>(&mut input) {
+								Ok(mut msg) =>
+									ipc.send(Incoming(Arc::new((msg.take_format(), msg.take_data())))),
+
+								Err(_) =>
+									break
+							}
+						}
+					}),
+
+					Err(_) => continue
 				}
 			}
 		});
