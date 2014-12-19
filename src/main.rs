@@ -49,7 +49,7 @@ Options:
   -p, --port PORT    Port to listen on (default 23421).
   -c, --config PATH  Path to the config file.
 ", flag_bind: Option<String>, flag_port: Option<u16>, flag_config: Option<String>,
-   arg_peers: Option<Vec<String>>)
+   arg_peers: Option<Vec<String>>);
 
 fn main() {
 	let peers: Vec<String>;
