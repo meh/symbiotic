@@ -23,6 +23,9 @@ use std::sync::Arc;
 use std::io::{TcpListener, TcpStream};
 use std::io::{Acceptor, Listener};
 
+use std::io::timer::sleep;
+use std::time::duration::Duration;
+
 use self::openssl::ssl::SslMethod::Sslv23;
 use self::openssl::ssl::{SslContext, SslStream};
 use self::openssl::ssl::SslVerifyMode::SslVerifyPeer;
@@ -33,8 +36,7 @@ use clipboard::Direction::Incoming;
 use protocol;
 
 use self::protobuf::Message;
-use self::protobuf::core::parse_length_delimited_from;
-use self::protobuf::stream::{CodedInputStream, CodedOutputStream};
+use self::protobuf::core::parse_length_delimited_from_reader;
 
 #[deriving(Clone)]
 pub struct Manager {
@@ -90,11 +92,14 @@ impl Manager {
 			spawn(move || {
 				loop {
 					let mut conn = match TcpStream::connect(host.as_slice()) {
-						Ok(conn) =>
-							conn,
+						Ok(conn) => {
+							conn
+						},
 
-						Err(_) =>
+						Err(_) => {
+							sleep(Duration::seconds(1));
 							continue
+						},
 					};
 
 					println!("client: connected");
@@ -102,11 +107,13 @@ impl Manager {
 					conn.set_nodelay(true).unwrap();
 					conn.close_read().unwrap();
 
-					let mut output = CodedOutputStream::new(&mut conn);
-
 					println!("client: sending handshake");
 
-					if Manager::identity().write_length_delimited_to(&mut output).is_err() {
+					if Manager::identity().write_length_delimited_to_writer(&mut conn).is_err() {
+						continue;
+					}
+
+					if conn.flush().is_err() {
 						continue;
 					}
 
@@ -125,7 +132,11 @@ impl Manager {
 							msg.set_format(format.clone());
 							msg.set_data(data.clone());
 
-							if msg.write_length_delimited_to(&mut output).is_err() {
+							if msg.write_length_delimited_to_writer(&mut conn).is_err() {
+								break;
+							}
+
+							if conn.flush().is_err() {
 								break;
 							}
 						}
@@ -157,11 +168,9 @@ impl Manager {
 						conn.set_nodelay(true).unwrap();
 						conn.close_write().unwrap();
 
-						let mut input = CodedInputStream::new(&mut conn);
-
 						println!("server: fo shizzle");
 
-						match parse_length_delimited_from::<protocol::handshake::Identity>(&mut input) {
+						match parse_length_delimited_from_reader::<protocol::handshake::Identity>(&mut conn) {
 							Ok(msg) => {
 								if !Manager::verify(&msg) {
 									println!("server: handshake invalid");
@@ -179,12 +188,15 @@ impl Manager {
 						println!("server: handshake verified");
 
 						loop {
-							match parse_length_delimited_from::<protocol::clipboard::Change>(&mut input) {
-								Ok(mut msg) =>
-									ipc.send(Incoming(Arc::new((msg.take_format(), msg.take_data())))),
+							match parse_length_delimited_from_reader::<protocol::clipboard::Change>(&mut conn) {
+								Ok(mut msg) => {
+									println!("server: received {}", msg);
+									ipc.send(Incoming(Arc::new((msg.take_format(), msg.take_data()))));
+								},
 
-								Err(_) =>
-									break
+								Err(_) => {
+									break;
+								}
 							}
 						}
 					}),
