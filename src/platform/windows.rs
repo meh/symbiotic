@@ -15,36 +15,31 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-#[allow(non_camel_case_types)]
-mod ffi {
-  use libc::{c_uint, uintptr_t};
-  use libc::types::os::arch::extra::{BOOL, HANDLE, LONG_PTR};
+extern crate toml;
 
-  type UINT = c_uint;
-  type UINT_PTR = uintptr_t;
-  type HWND = HANDLE;
-  type WPARAM = UINT_PTR;
-  type LPARAM = LONG_PTR;
+use std::sync::Arc;
 
-  pub static HWND_BROADCAST: HWND = 0xffff as HWND;
-  pub static WM_SYSCOMMAND: UINT = 0x0112;
-  pub static SC_MONITORPOWER: WPARAM = 0xf170;
+use clipboard;
+use clipboard::{Message, Change};
+use clipboard::Direction::Outgoing;
 
-  #[link(name = "user32")]
-  extern "stdcall" {
-    pub fn SendNotifyMessageW(hwnd: HWND, msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL;
-  }
-}
-
+#[deriving(Clone, Show)]
 pub struct Clipboard {
 	x: int,
 }
 
 impl Clipboard {
-	pub fn new() {
-		Clipboard { x: 2 }
+	pub fn new(specs: Option<toml::Value>) -> Clipboard {
+		Clipboard {
+			x: 42
+		}
 	}
 }
 
-/*impl clipboard::Clipboard for Clipboard {*/
-/*}*/
+impl clipboard::Clipboard for Clipboard {
+	fn start(&self, ipc: Sender<Message>) {
+	}
+
+	fn set(&self, value: Change) {
+	}
+}
