@@ -7,9 +7,7 @@ authors = ["meh. <meh@schizofreni.co>"]
 git = "https://github.com/stepancheg/rust-protobuf.git"
 
 [dependencies.docopt_macros]
-#git = "https://github.com/docopt/docopt.rs.git"
-git = "https://github.com/kinghajj/docopt.rs.git"
-branch = "fixes"
+git = "https://github.com/docopt/docopt.rs.git"
 
 [dependencies.toml]
 git = "https://github.com/alexcrichton/toml-rs.git"
