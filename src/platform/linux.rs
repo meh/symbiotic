@@ -23,6 +23,7 @@ use std::time::duration::Duration;
 use std::hash;
 use std::hash::Hash;
 
+use std::thread::Thread;
 use std::sync::Arc;
 
 use clipboard;
@@ -36,48 +37,53 @@ mod x11 {
 	use self::libc::{c_void, c_int, c_uint, c_ulong, c_long, c_uchar};
 	use std::ops::Drop;
 	use std::ptr;
+	use std::mem;
+	use std::c_str::CString;
+	use std::slice;
+	use std::collections::BTreeMap;
 
 	pub type Id   = c_ulong;
 	pub type Atom = c_ulong;
 	pub type Time = c_ulong;
 	pub type Bool = c_int;
 
-	pub static PROPERTY_CHANGE_MASK: c_long = 1 << 22;
+	pub static PropertyChangeMask: c_long = 1 << 22;
+
 	pub static False: Bool = 0;
 	pub static True: Bool  = 1;
 
 	pub static CurrentTime: Time = 0;
 
-	#[allow(dead_code)]
-	pub mod event {
-		extern crate libc;
+	#[deriving(Show)]
+	#[repr(C)]
+	pub struct Event {
+		pub kind:    c_int,
+		pub serial:  c_ulong,
+		pub fake:    c_int,
+		pub display: *const c_void,
+		pub window:  Id,
 
-		use self::libc::{c_void, c_int, c_uint, c_ulong, c_long};
+		_data: [u64, ..20u]
+	}
 
-		#[repr(C)]
-		pub struct Event {
-			kind:    c_int,
-			serial:  c_ulong,
-			fake:    c_int,
-			display: *const c_void,
-			window:  super::Id,
+	#[deriving(Show)]
+	#[repr(C)]
+	pub struct SelectionNotify {
+		pub selection: Atom,
+		pub target:    Atom,
+		pub property:  Atom,
+		pub time:      Time,
+	}
 
-			_data: [u64, ..20u]
-		}
-
-		#[repr(C)]
-		pub struct Selection {
-			selection: super::Atom,
-			target:    super::Atom,
-			property:  super::Atom,
-			time:      super::Time,
-		}
-
-		impl Event {
-			pub fn details<T>(&mut self) -> *mut T {
-				unsafe {
+	impl Event {
+		pub fn as_selection_notify(&self) -> Option<&SelectionNotify> {
+			if self.kind == 31 {
+				Some(unsafe {
 					::std::mem::transmute(&self._data)
-				}
+				})
+			}
+			else {
+				None
 			}
 		}
 	}
@@ -98,14 +104,114 @@ mod x11 {
 
 		fn XInternAtom(display: *const c_void, name: *const i8, if_exist: c_int) -> Atom;
 
-		fn XNextEvent(display: *const c_void, event: *mut c_void) -> c_int;
+		fn XGetAtomName(display: *const c_void, id: Atom) -> *const i8;
+
+		fn XNextEvent(display: *const c_void, event: *mut Event) -> c_int;
 
 		fn XConvertSelection(display: *const c_void, selection: Atom, target: Atom, property: Atom,
 		                     requestor: Id, time: Time) -> c_int;
 
+		fn XGetWindowProperty(display: *const c_void, w: Id, property: Atom,
+		                      long_offset: c_long, long_length: c_long,
+		                      delete: Bool, req_type: Atom,
+		                      actual_type_return: *mut Atom, actual_format_return: *mut c_int,
+		                      nitems_return: *mut c_ulong, bytes_after_return: *mut c_ulong,
+		                      prop_return: *mut *mut c_uchar) -> c_int;
+
+		fn XDeleteProperty(display: *const c_void, window: Id, property: Atom) -> c_int;
+
 		fn XFetchBuffer(display: *const c_void, length: *mut c_int, buffer: c_int) -> *mut c_uchar;
 
 		fn XFree(data: *mut c_void) -> c_int;
+	}
+
+	#[link(name = "Xmu")]
+	extern "system" {
+		static _XA_CLIPBOARD:   *const c_void;
+		static _XA_UTF8_STRING: *const c_void;
+		static _XA_TARGETS:     *const c_void;
+		static _XA_TIMESTAMP:   *const c_void;
+
+		fn XmuInternAtom(display: *const c_void, atom: *const c_void) -> Atom;
+	}
+
+	pub struct AtomCache {
+		display: *const c_void,
+		map:     BTreeMap<String, Atom>,
+	}
+
+	impl AtomCache {
+		pub fn new(display: *const c_void) -> AtomCache {
+			AtomCache {
+				display: display,
+				map:     BTreeMap::new(),
+			}
+		}
+
+		pub fn intern(&mut self, name: &str) -> Atom {
+			if let Some(id) = self.map.get(&name.to_string()) {
+				return *id;
+			}
+
+			let id = unsafe {
+				match name {
+					"PRIMARY" => {
+						1
+					},
+
+					"SECONDARY" => {
+						2
+					},
+
+					"STRING" => {
+						31
+					},
+
+					"UTF8_STRING" => {
+						XmuInternAtom(self.display, _XA_UTF8_STRING)
+					},
+
+					"CLIPBOARD" => {
+						XmuInternAtom(self.display, _XA_CLIPBOARD)
+					},
+
+					"TIMESTAMP" => {
+						XmuInternAtom(self.display, _XA_TIMESTAMP)
+					},
+
+					"TARGETS" => {
+						XmuInternAtom(self.display, _XA_TARGETS)
+					},
+
+					_ => {
+						XInternAtom(self.display, name.to_c_str().as_ptr(), False)
+					}
+				}
+			};
+
+			self.map.insert(name.to_string(), id);
+
+			id
+		}
+
+		pub fn name(&self, id: Atom) -> String {
+			if id == 0 {
+				return "None".to_string();
+			}
+
+			unsafe {
+				let buffer = XGetAtomName(self.display, id);
+				let result = String::from_str(CString::new(buffer, false).as_str().unwrap());
+
+				XFree(buffer as *mut c_void);
+
+				result
+			}
+		}
+
+		pub fn hint(&mut self, name: &str, id: Atom) {
+			self.map.insert(name.to_string(), id);
+		}
 	}
 
 	pub struct Display {
@@ -115,6 +221,34 @@ mod x11 {
 	pub struct Window {
 		display: *const c_void,
 		id:      Id,
+	}
+
+	#[deriving(Show)]
+	pub struct Property<'a> {
+		pub id:   Atom,
+		pub kind: Atom,
+
+		format: c_int,
+		items:  c_ulong,
+		data:   Vec<u8>,
+	}
+
+	impl<'a> Property<'a> {
+		pub fn items<T>(&self) -> Option<&'a [T]> {
+			if self.format == (mem::size_of::<T>() * 8) as i32 {
+				return unsafe {
+					Some(slice::from_raw_buf(mem::transmute(&self.data.as_ptr()), self.items as uint))
+				}
+			}
+
+			if self.format == 32 && mem::size_of::<T>() == 8 {
+				return unsafe {
+					Some(slice::from_raw_buf(mem::transmute(&self.data.as_ptr()), (self.items / 2) as uint))
+				}
+			}
+
+			None
+		}
 	}
 
 	impl Display {
@@ -137,6 +271,10 @@ mod x11 {
 			}
 		}
 
+		pub fn atom(&self) -> AtomCache {
+			AtomCache::new(self.pointer)
+		}
+
 		pub fn root(&self) -> Window {
 			Window {
 				display: self.pointer,
@@ -153,12 +291,6 @@ mod x11 {
 			}
 		}
 		
-		pub fn intern(&self, name: &str) -> Atom {
-			unsafe {
-				XInternAtom(self.pointer, name.to_c_str().as_ptr(), False)
-			}
-		}
-
 		pub fn fetch_buffer(&self, id: i32) -> Vec<u8> {
 			unsafe {
 				let mut length: c_int = 0;
@@ -171,6 +303,16 @@ mod x11 {
 				XFree(buffer as *mut c_void);
 
 				result
+			}
+		}
+
+		pub fn next_event(&self) -> Event {
+			unsafe {
+				let mut event: Event = mem::uninitialized();
+
+				XNextEvent(self.pointer, (&mut event) as *mut _);
+
+				event
 			}
 		}
 	}
@@ -203,111 +345,188 @@ mod x11 {
 				XConvertSelection(self.display, selection, target, property, self.id, CurrentTime)
 			}
 		}
+
+		pub fn get_property(&self, id: Atom) -> Option<Property> {
+			unsafe {
+				let mut buffer: *mut c_uchar = mem::uninitialized();
+				let mut kind:   Atom         = mem::uninitialized();
+				let mut format: c_int        = mem::uninitialized();
+				let mut items:  c_ulong      = mem::uninitialized();
+				let mut after:  c_ulong      = mem::uninitialized();
+				let     data:   Vec<u8>;
+
+				XGetWindowProperty(self.display, self.id, id, 0, !0, False, 0, &mut kind, &mut format, &mut items, &mut after, &mut buffer);
+
+				if kind == 0 {
+					return None;
+				}
+
+				data = Vec::from_raw_buf(buffer as *const u8, (items * ((format / 8) as u64)) as uint);
+
+				XFree(buffer as *mut c_void);
+
+				Some(Property {
+					id:     id,
+					kind:   kind,
+					format: format,
+					items:  items,
+					data:   data
+				})
+			}
+		}
+		
+		pub fn delete_property(&self, id: Atom) {
+			unsafe {
+				XDeleteProperty(self.display, self.id, id);
+			}
+		}
 	}
 }
 
-#[deriving(Clone, Show)]
-enum Selection {
-	Primary,
-	Secondary,
+enum Source {
+	Selection,
 	Clipboard,
-	String,
 }
 
-#[deriving(Clone, Show)]
 pub struct Clipboard {
-	display:   Option<String>,
-	selection: Selection,
+	display: Option<String>,
+	source:  Source,
 }
 
 impl Clipboard {
 	pub fn new(specs: Option<toml::Value>) -> Clipboard {
-		let mut display   = None;
-		let mut selection = Selection::Primary;
+		let mut display = None;
+		let mut source  = Source::Selection;
 
-		if specs.is_some() {
-			let table = specs.unwrap();
-
-			if table.lookup("display").is_some() {
-				display = Some(table.lookup("display").unwrap().as_str().unwrap().to_string());
+		if let Some(table) = specs {
+			if let Some(value) = table.lookup("display") {
+				display = Some(value.as_str().unwrap().to_string());
 			}
 
-			if table.lookup("selection").is_some() {
-				selection = match table.lookup("selection").unwrap().as_str().unwrap() {
-					"primary"   => Selection::Primary,
-					"secondary" => Selection::Secondary,
-					"clipboard" => Selection::Clipboard,
-					"string"    => Selection::String,
-
-					_ => panic!("unknown selection type")
-				}
+			if let Some(value) = table.lookup("source") {
+				source = match value.as_slice() {
+					"selection" => Source::Selection,
+					"clipboard" => Source::Clipboard,
+				};
 			}
 		}
 
 		Clipboard {
-			display:   display,
-			selection: selection,
+			display: display,
+			source:  source,
 		}
 	}
 }
 
+#[allow(non_snake_case)]
 impl clipboard::Clipboard for Clipboard {
 	fn start(&self, ipc: Sender<Message>) {
 		let config  = self.clone();
 		let display = x11::Display::open(config.display.as_ref()).unwrap();
 		let window  = x11::Window::open(&display, &display.root(), (0, 0), (1, 1), (0, 0), 0);
+		let source  = match config.source {
+			Source::Selection => display.intern("PRIMARY"),
+			Source::Clipboard => display.intern("CLIPBOARD"),
+		};
 
-		display.select(&window, x11::PROPERTY_CHANGE_MASK);
+		display.select(&window, x11::PropertyChangeMask);
 
-		spawn(move || {
+		Thread::spawn(move || -> () {
+			#[deriving(Show)]
 			enum State {
 				None,
-				Sent,
-				Incr,
-				Fallback,
+				Formats,
+				Timestamp,
+				Fetch,
 				Done,
 			}
 
-			let property = display.intern("SYMBIOTIC_CLIPBOARD");
+			struct Channel {
+				channel: Sender<Message>,
+				hash:    u64,
+				time:    u64,
+				id:      u64,
+			}
+			
+			impl Channel {
+				fn new(channel: Sender<Message>) -> Channel {
+					Channel {
+						channel: channel,
+						hash:    0,
+						id:      0,
+						time:    0,
+					}
+				}
 
-			let mut format: x11::Atom;
-			let mut state = State::None;
+				// TODO: actually implement it
+				fn next(&mut self, timestamp: u64, format: &str, data: &Vec<u8>) -> u64 {
+					0
+				}
+
+				fn send(&mut self, timestamp: u64, format: &str, data: Vec<u8>) {
+					let id      = self.next(timestamp, format, &data);
+					let message = (timestamp, format.to_string(), data);
+
+					self.channel.send(Outgoing(Arc::new(message)));
+				}
+			}
+
+			let mut atom      = display.atom();
+			let mut channel   = Channel::new(ipc);
+			let mut state     = State::None;
+			let mut formats   = Vec::new();
+			let mut timestamp = 0u64;
 
 			loop {
+				debug!("STATE: {}", state);
+
 				match state {
 					State::None => {
-						match config.selection {
-							Selection::String => {
-								ipc.send(Outgoing(Arc::new(("text/plain".to_string(), display.fetch_buffer(1)))));
+						window.convert_selection(source, atom.intern("TARGETS"), atom.intern("SYMBIOTIC"));
 
-								state = State::Done;
-							},
+						state = State::Formats;
+					},
 
-							_ => {
-								/*window.convert_selection()*/
+					State::Formats => {
+						let event = display.next_event();
+
+						if let Some(details) = event.as_selection_notify() {
+							if details.property != 0 {
+								if let Some(property) = window.get_property(atom.intern("SYMBIOTIC")) {
+									for id in property.items::<x11::Atom>().unwrap().iter() {
+										let name = atom.name(*id);
+
+										atom.hint(name.as_slice(), *id);
+										formats.push(name);
+									}
+
+									window.delete_property(atom.intern("SYMBIOTIC"));
+
+									debug!("formats: {}", formats);
+								}
 							}
+
+							state = State::Done;
 						}
 					},
 
-					State::Sent => {
-
+					State::Timestamp => {
 					},
 
-					State::Incr => { 
-					},
-
-					State::Fallback => {
+					State::Fetch => {
 
 					},
 
 					State::Done => {
-						state = State::None;
+						timestamp = 0;
+						state     = State::None;
+						formats   = Vec::new();
 
 						sleep(Duration::seconds(1));
 					}
 				}
 			}
-		});
+		}).detach();
 	}
 
 	fn set(&self, value: Change) {
