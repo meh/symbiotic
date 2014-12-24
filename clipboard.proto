@@ -1,7 +1,19 @@
 package symbiotic.protocol.clipboard;
 
+// Represents the content of the clipboard in a supported format.
+message Content {
+	// MIME-type of the format.
+	required string format = 1;
+
+	// The data of the clipboard in the given format.
+	required bytes data = 2;
+}
+
+// Represents a change in the clipboard.
 message Change {
-	required uint64 at     = 1;
-	required string format = 2;
-	required bytes  data   = 3;
+	// The timestamp when the clipboard was changed.
+	required uint64 at = 1;
+
+	// List of contents in the formats supported by the clipboard.
+	repeated Content content = 2;
 }
