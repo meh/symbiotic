@@ -12,7 +12,7 @@ message Content {
 // Represents a change in the clipboard.
 message Change {
 	// The timestamp when the clipboard was changed.
-	required uint64 at = 1;
+	optional uint64 at = 1;
 
 	// List of contents in the formats supported by the clipboard.
 	repeated Content content = 2;
