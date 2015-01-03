@@ -3,6 +3,11 @@ name    = "symbiotic-clipboard"
 version = "0.1.0"
 authors = ["meh. <meh@schizofreni.co>"]
 
+[dependencies]
+regex           = "0.1.0"
+log             = "0.1.0"
+rustc-serialize = "0.1.0"
+
 [dependencies.protobuf]
 git = "https://github.com/stepancheg/rust-protobuf.git"
 
