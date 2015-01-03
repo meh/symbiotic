@@ -15,21 +15,20 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-#![feature(phase, unboxed_closures)]
+#![feature(phase)]
 
 // XXX: remove me when done prototyping
 #![allow(dead_code, unused_variables, unused_imports)]
 
 extern crate protobuf;
-extern crate serialize;
+extern crate "rustc-serialize" as rustc_serialize;
 extern crate toml;
 extern crate docopt;
-#[phase(plugin)]
-extern crate docopt_macros;
+#[phase(plugin)] extern crate docopt_macros;
+#[phase(plugin, link)] extern crate log;
 
 use std::io::File;
 
-use clipboard::Clipboard;
 use clipboard::{Change, Message};
 use clipboard::Direction::{Incoming, Outgoing};
 
@@ -98,22 +97,18 @@ fn main() {
 		}
 	}
 
-	let (sender, receiver): (Sender<Message>, Receiver<Message>) = channel();
-
-	let mut manager   = connection::Manager::new(bind, port, peers);
-	let     clipboard = platform::Clipboard::new(specs);
+	let (sender, receiver) = channel::<Message>();
+	let connection         = connection::start(sender.clone(), bind, port, peers);
+	let clipboard          = platform::start(sender.clone(), specs);
 	
-	clipboard.start(sender.clone());
-	manager.start(sender.clone());
-
 	loop {
 		match receiver.recv() {
 			Incoming(change) => {
-				clipboard.set(change);
+				clipboard.send(change);
 			},
 
 			Outgoing(change) => {
-				manager.set(change);
+				connection.send(change);
 			}
 		}
 	}

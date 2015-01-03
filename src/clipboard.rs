@@ -17,7 +17,9 @@
 
 use std::sync::Arc;
 
-pub type Change = Arc<(String, Vec<u8>)>;
+pub type Timestamp = u64;
+pub type Content   = (String, Vec<u8>);
+pub type Change    = Arc<(Timestamp, Vec<Content>)>;
 
 pub enum Direction<T> {
 	Incoming(T),
@@ -25,8 +27,3 @@ pub enum Direction<T> {
 }
 
 pub type Message = Direction<Change>;
-
-pub trait Clipboard {
-	fn start(&self, channel: Sender<Message>);
-	fn set(&self, value: Change);
-}
