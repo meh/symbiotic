@@ -47,68 +47,103 @@ Options:
   -b, --bind IP      IP to bind on (default 0.0.0.0).
   -p, --port PORT    Port to listen on (default 23421).
   -c, --config PATH  Path to the config file.
+
+  -i, --incoming     Only receive clipboard changes.
+  -o, --outgoing     Only send clipboard changes.
 ", flag_bind: Option<String>, flag_port: Option<u16>, flag_config: Option<String>,
    arg_peers: Option<Vec<String>>);
 
 fn main() {
-	let peers: Vec<String>;
-	let bind:  String;
-	let port:  u16;
-	let specs: Option<toml::Value>;
+	#[deriving(PartialEq, Eq)]
+	enum Mode {
+		Both,
+		Incoming,
+		Outgoing,
+	}
+
+	let mut peers:    Vec<String>         = vec!();
+	let mut bind:     String              = "0.0.0.0".to_string();
+	let mut port:     u16                 = 23421;
+	let mut platform: Option<toml::Value> = None;
+	let mut mode:     Mode                = Mode::Both;
 
 	let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
 
-	match args.flag_config {
-		Some(path) => {
-			let config = match File::open(&Path::new(path.as_slice())).read_to_string().ok() {
-				Some(content) => 
-					toml::Parser::new(content.as_slice()).parse().unwrap(),
+	if let Some(path) = args.flag_config {
+		let config = match File::open(&Path::new(path.as_slice())).read_to_string().ok() {
+			Some(content) =>
+				toml::Parser::new(content.as_slice()).parse().unwrap(),
 
-				None =>
-					panic!("{}: file not found", path)
-			};
+			None =>
+				panic!("{}: file not found", path)
+		};
 
-			peers = match config.get("peers") {
-				Some(h) => h.as_slice().unwrap().iter()
-				            .map(|x| x.as_str().unwrap().to_string())
-				            .collect::<Vec<String>>(),
-
-				None => vec!()
-			};
-
-			port = match config.get("port") {
-				Some(p) => p.as_integer().unwrap().to_u16().unwrap(),
-				None    => 23421
-			};
-
-			bind = match config.get("bind") {
-				Some(b) => b.as_str().unwrap().to_string(),
-				None    => "0.0.0.0".to_string()
-			};
-
-			specs = config.get("platform").map(|p| p.clone());
+		if let Some(h) = config.get("peers") {
+			peers = h.as_slice().unwrap().iter()
+			         .map(|x| x.as_str().unwrap().to_string())
+			         .collect::<Vec<String>>();
 		}
 
-		None => {
-			peers = args.arg_peers.unwrap_or(vec!());
-			port  = args.flag_port.unwrap_or(23421);
-			bind  = args.flag_bind.unwrap_or("0.0.0.0".to_string());
-			specs = None;
+		if let Some(p) = config.get("port") {
+			port = p.as_integer().unwrap().to_u16().unwrap();
+		}
+
+
+		if let Some(b) = config.get("bind") {
+			bind = b.as_str().unwrap().to_string();
+		}
+
+
+		if let Some(m) = config.get("mode") {
+			mode = match m.as_str().unwrap() {
+				"both"     => Mode::Both,
+				"incoming" => Mode::Incoming,
+				"outgoing" => Mode::Outgoing,
+
+				n => panic!("{}: unknown mode", n)
+			};
+		}
+
+		platform = config.get("platform").map(|p| p.clone());
+	}
+	else {
+		if let Some(p) = args.arg_peers {
+			peers = p;
+		}
+
+		if let Some(p) = args.flag_port {
+			port = p;
+		}
+
+		if let Some(b) = args.flag_bind {
+			bind = b;
+		}
+
+		if args.flag_incoming {
+			mode = Mode::Incoming;
+		}
+
+		if args.flag_outgoing {
+			mode = Mode::Outgoing;
 		}
 	}
 
 	let (sender, receiver) = channel::<Message>();
 	let connection         = connection::start(sender.clone(), bind, port, peers);
-	let clipboard          = platform::start(sender.clone(), specs);
+	let clipboard          = platform::start(sender.clone(), platform);
 	
 	loop {
 		match receiver.recv() {
 			Incoming(change) => {
-				clipboard.send(change);
+				if mode != Mode::Outgoing {
+					clipboard.send(change);
+				}
 			},
 
 			Outgoing(change) => {
-				connection.send(change);
+				if mode != Mode::Incoming {
+					connection.send(change);
+				}
 			}
 		}
 	}
