@@ -15,7 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-#![feature(phase)]
+#![feature(plugin)]
+#![allow(unstable)]
 
 // XXX: remove me when done prototyping
 #![allow(dead_code, unused_variables, unused_imports)]
@@ -24,10 +25,16 @@ extern crate protobuf;
 extern crate "rustc-serialize" as rustc_serialize;
 extern crate toml;
 extern crate docopt;
-#[phase(plugin)] extern crate docopt_macros;
-#[phase(plugin, link)] extern crate log;
+#[plugin] extern crate docopt_macros;
+#[macro_use] extern crate log;
 
 use std::io::File;
+use std::num::ToPrimitive;
+
+// XXX: remove me
+use std::sync::Arc;
+
+use std::sync::mpsc::channel;
 
 use clipboard::{Change, Message};
 use clipboard::Direction::{Incoming, Outgoing};
@@ -37,7 +44,7 @@ mod platform;
 mod clipboard;
 mod protocol;
 
-docopt!(Args deriving Show, "
+docopt!(Args derive Show, "
 Usage: symbiotic-clipboard (-c PATH | --config PATH)
        symbiotic-clipboard [options] <peers>...
        symbiotic-clipboard --help
@@ -54,7 +61,7 @@ Options:
    arg_peers: Option<Vec<String>>);
 
 fn main() {
-	#[deriving(PartialEq, Eq)]
+	#[derive(PartialEq, Eq)]
 	enum Mode {
 		Both,
 		Incoming,
@@ -88,11 +95,9 @@ fn main() {
 			port = p.as_integer().unwrap().to_u16().unwrap();
 		}
 
-
 		if let Some(b) = config.get("bind") {
 			bind = b.as_str().unwrap().to_string();
 		}
-
 
 		if let Some(m) = config.get("mode") {
 			mode = match m.as_str().unwrap() {
@@ -131,18 +136,23 @@ fn main() {
 	let (sender, receiver) = channel::<Message>();
 	let connection         = connection::start(sender.clone(), bind, port, peers);
 	let clipboard          = platform::start(sender.clone(), platform);
-	
+
+	// TODO: remove me
+	if mode == Mode::Incoming {
+		clipboard.send(Arc::new((0, vec!(("plain/text".to_string(), vec!(116, 101, 115, 116)))))).unwrap();
+	}
+
 	loop {
-		match receiver.recv() {
+		match receiver.recv().unwrap() {
 			Incoming(change) => {
 				if mode != Mode::Outgoing {
-					clipboard.send(change);
+					clipboard.send(change).unwrap();
 				}
 			},
 
 			Outgoing(change) => {
 				if mode != Mode::Incoming {
-					connection.send(change);
+					connection.send(change).unwrap();
 				}
 			}
 		}
