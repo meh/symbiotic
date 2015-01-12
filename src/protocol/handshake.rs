@@ -8,7 +8,7 @@
 use protobuf::Message as Message_imported_for_functions;
 use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 
-#[deriving(Clone,Default)]
+#[derive(Clone,Default)]
 pub struct Version {
     major: ::std::option::Option<u32>,
     minor: ::std::option::Option<u32>,
@@ -99,10 +99,6 @@ impl Version {
 }
 
 impl ::protobuf::Message for Version {
-    fn new() -> Version {
-        Version::new()
-    }
-
     fn is_initialized(&self) -> bool {
         if self.major.is_none() {
             return false;
@@ -193,6 +189,20 @@ impl ::protobuf::Message for Version {
         &mut self.unknown_fields
     }
 
+    fn type_id(&self) -> ::std::intrinsics::TypeId {
+        ::std::intrinsics::TypeId::of::<Version>()
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        ::protobuf::MessageStatic::descriptor_static(None::<Self>)
+    }
+}
+
+impl ::protobuf::MessageStatic for Version {
+    fn new() -> Version {
+        Version::new()
+    }
+
     #[allow(unused_unsafe,unused_mut)]
     fn descriptor_static(_: ::std::option::Option<Version>) -> &'static ::protobuf::reflect::MessageDescriptor {
         static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
@@ -225,10 +235,6 @@ impl ::protobuf::Message for Version {
             })
         }
     }
-
-    fn type_id(&self) -> ::std::intrinsics::TypeId {
-        ::std::intrinsics::TypeId::of::<Version>()
-    }
 }
 
 impl ::protobuf::Clear for Version {
@@ -251,11 +257,11 @@ impl ::std::cmp::PartialEq for Version {
 
 impl ::std::fmt::Show for Version {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        self.fmt_impl(f)
+        ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[deriving(Clone,Default)]
+#[derive(Clone,Default)]
 pub struct Identity {
     name: ::protobuf::SingularField<::std::string::String>,
     version: ::protobuf::SingularPtrField<Version>,
@@ -356,10 +362,6 @@ impl Identity {
 }
 
 impl ::protobuf::Message for Identity {
-    fn new() -> Identity {
-        Identity::new()
-    }
-
     fn is_initialized(&self) -> bool {
         if self.name.is_none() {
             return false;
@@ -437,6 +439,20 @@ impl ::protobuf::Message for Identity {
         &mut self.unknown_fields
     }
 
+    fn type_id(&self) -> ::std::intrinsics::TypeId {
+        ::std::intrinsics::TypeId::of::<Identity>()
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        ::protobuf::MessageStatic::descriptor_static(None::<Self>)
+    }
+}
+
+impl ::protobuf::MessageStatic for Identity {
+    fn new() -> Identity {
+        Identity::new()
+    }
+
     #[allow(unused_unsafe,unused_mut)]
     fn descriptor_static(_: ::std::option::Option<Identity>) -> &'static ::protobuf::reflect::MessageDescriptor {
         static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
@@ -464,10 +480,6 @@ impl ::protobuf::Message for Identity {
             })
         }
     }
-
-    fn type_id(&self) -> ::std::intrinsics::TypeId {
-        ::std::intrinsics::TypeId::of::<Identity>()
-    }
 }
 
 impl ::protobuf::Clear for Identity {
@@ -488,7 +500,7 @@ impl ::std::cmp::PartialEq for Identity {
 
 impl ::std::fmt::Show for Identity {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        self.fmt_impl(f)
+        ::protobuf::text_format::fmt(self, f)
     }
 }
 

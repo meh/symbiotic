@@ -8,7 +8,7 @@
 use protobuf::Message as Message_imported_for_functions;
 use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 
-#[deriving(Clone,Default)]
+#[derive(Clone,Default)]
 pub struct Content {
     format: ::protobuf::SingularField<::std::string::String>,
     data: ::protobuf::SingularField<::std::vec::Vec<u8>>,
@@ -112,10 +112,6 @@ impl Content {
 }
 
 impl ::protobuf::Message for Content {
-    fn new() -> Content {
-        Content::new()
-    }
-
     fn is_initialized(&self) -> bool {
         if self.format.is_none() {
             return false;
@@ -190,6 +186,20 @@ impl ::protobuf::Message for Content {
         &mut self.unknown_fields
     }
 
+    fn type_id(&self) -> ::std::intrinsics::TypeId {
+        ::std::intrinsics::TypeId::of::<Content>()
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        ::protobuf::MessageStatic::descriptor_static(None::<Self>)
+    }
+}
+
+impl ::protobuf::MessageStatic for Content {
+    fn new() -> Content {
+        Content::new()
+    }
+
     #[allow(unused_unsafe,unused_mut)]
     fn descriptor_static(_: ::std::option::Option<Content>) -> &'static ::protobuf::reflect::MessageDescriptor {
         static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
@@ -217,10 +227,6 @@ impl ::protobuf::Message for Content {
             })
         }
     }
-
-    fn type_id(&self) -> ::std::intrinsics::TypeId {
-        ::std::intrinsics::TypeId::of::<Content>()
-    }
 }
 
 impl ::protobuf::Clear for Content {
@@ -241,11 +247,11 @@ impl ::std::cmp::PartialEq for Content {
 
 impl ::std::fmt::Show for Content {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        self.fmt_impl(f)
+        ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[deriving(Clone,Default)]
+#[derive(Clone,Default)]
 pub struct Change {
     at: ::std::option::Option<u64>,
     content: ::protobuf::RepeatedField<Content>,
@@ -321,10 +327,6 @@ impl Change {
 }
 
 impl ::protobuf::Message for Change {
-    fn new() -> Change {
-        Change::new()
-    }
-
     fn is_initialized(&self) -> bool {
         true
     }
@@ -341,11 +343,7 @@ impl ::protobuf::Message for Change {
                     self.at = ::std::option::Option::Some(tmp);
                 },
                 2 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
-                    };
-                    let tmp = self.content.push_default();
-                    try!(is.merge_message(tmp))
+                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.content));
                 },
                 _ => {
                     let unknown = try!(is.read_unknown(wire_type));
@@ -396,6 +394,20 @@ impl ::protobuf::Message for Change {
         &mut self.unknown_fields
     }
 
+    fn type_id(&self) -> ::std::intrinsics::TypeId {
+        ::std::intrinsics::TypeId::of::<Change>()
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        ::protobuf::MessageStatic::descriptor_static(None::<Self>)
+    }
+}
+
+impl ::protobuf::MessageStatic for Change {
+    fn new() -> Change {
+        Change::new()
+    }
+
     #[allow(unused_unsafe,unused_mut)]
     fn descriptor_static(_: ::std::option::Option<Change>) -> &'static ::protobuf::reflect::MessageDescriptor {
         static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
@@ -422,10 +434,6 @@ impl ::protobuf::Message for Change {
             })
         }
     }
-
-    fn type_id(&self) -> ::std::intrinsics::TypeId {
-        ::std::intrinsics::TypeId::of::<Change>()
-    }
 }
 
 impl ::protobuf::Clear for Change {
@@ -446,7 +454,7 @@ impl ::std::cmp::PartialEq for Change {
 
 impl ::std::fmt::Show for Change {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        self.fmt_impl(f)
+        ::protobuf::text_format::fmt(self, f)
     }
 }
 
