@@ -20,6 +20,7 @@ extern crate protobuf;
 
 use std::sync::Arc;
 use std::thread::Thread;
+use std::sync::mpsc::{Sender, channel};
 
 use std::io::{TcpListener, TcpStream};
 use std::io::{Acceptor, Listener};
@@ -78,14 +79,14 @@ pub fn start(host: String) -> Sender<clipboard::Change> {
 				continue;
 			}
 
-			debug!("client: sent handshake: {}", identity());
+			debug!("client: sent handshake: {:?}", identity());
 
 			loop {
 				debug!("client: waiting for message");
 
-				let (ref at, ref content) = *receiver.recv();
+				let (ref at, ref content) = *receiver.recv().unwrap();
 
-				debug!("client: message received: @{} {}", at, content);
+				debug!("client: message received: @{:?} {:?}", at, content);
 
 				{
 					let mut msg = protocol::clipboard::Change::new();
@@ -108,7 +109,7 @@ pub fn start(host: String) -> Sender<clipboard::Change> {
 				debug!("client: message sent");
 			}
 		}
-	}).detach();
+	});
 
 	sender
 }

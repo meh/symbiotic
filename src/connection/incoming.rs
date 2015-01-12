@@ -20,6 +20,7 @@ extern crate protobuf;
 
 use std::sync::Arc;
 use std::thread::Thread;
+use std::sync::mpsc::Sender;
 
 use std::io::{TcpListener, TcpStream};
 use std::io::{Acceptor, Listener};
@@ -91,7 +92,7 @@ pub fn start(main: Sender<clipboard::Message>, bind: String, port: u16, peers: V
 						},
 
 						Err(error) => {
-							debug!("server: handshake error: {}", error);
+							debug!("server: handshake error: {:?}", error);
 							return;
 						}
 					}
@@ -101,7 +102,7 @@ pub fn start(main: Sender<clipboard::Message>, bind: String, port: u16, peers: V
 					loop {
 						match parse_length_delimited_from::<protocol::clipboard::Change>(&mut input) {
 							Ok(mut msg) => {
-								debug!("server: received {}", msg);
+								debug!("server: received {:?}", msg);
 								//ipc.send(Incoming(Arc::new((msg.get_id(), msg.take_format(), msg.take_data()))));
 							},
 
@@ -110,11 +111,11 @@ pub fn start(main: Sender<clipboard::Message>, bind: String, port: u16, peers: V
 							}
 						}
 					}
-				}).detach()
+				});
 			}
 			else {
 				continue
 			}
 		}
-	}).detach();
+	});
 }

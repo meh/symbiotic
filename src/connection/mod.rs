@@ -17,6 +17,8 @@
 
 extern crate regex;
 
+use std::sync::mpsc::{Sender, SendError};
+
 use self::regex::Regex;
 
 use clipboard;
@@ -27,12 +29,16 @@ mod outgoing;
 pub struct Broadcast(Vec<Sender<clipboard::Change>>);
 
 impl Broadcast {
-	pub fn send(&self, change: clipboard::Change) {
-		println!("{}", change);
+	pub fn send(&self, change: clipboard::Change) -> Result<(), SendError<clipboard::Change>> {
+		println!("{:?}", change);
 
 		for chan in self.0.iter() {
-			chan.send(change.clone());
+			if let error@Err(..) = chan.send(change.clone()) {
+				return error;
+			}
 		}
+
+		Ok(())
 	}
 }
 
