@@ -73,11 +73,11 @@ fn main() {
 	let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
 
 	if let Some(path) = args.flag_config {
-		let config = match File::open(&Path::new(path.as_slice())).read_to_string().ok() {
-			Some(content) =>
+		let config = match File::open(&Path::new(path.as_slice())).read_to_string() {
+			Ok(content) =>
 				toml::Parser::new(content.as_slice()).parse().unwrap(),
 
-			None =>
+			Err(..) =>
 				panic!("{}: file not found", path)
 		};
 
