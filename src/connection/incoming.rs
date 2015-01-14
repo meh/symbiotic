@@ -140,37 +140,31 @@ pub fn start(channel: Sender<clipboard::Message>, host: Peer, peers: Vec<Peer>) 
 
 				debug!("server: fo shizzle");
 
-				match parse_length_delimited_from::<protocol::handshake::Identity>(&mut conn) {
-					Ok(msg) => {
-						if !verify(&msg) {
-							debug!("server: handshake invalid");
+				if let Ok(msg) = parse_length_delimited_from::<protocol::handshake::Identity>(&mut conn) {
+					if !verify(&msg) {
+						debug!("server: handshake invalid");
 
-							return;
-						}
-					},
-
-					Err(error) => {
-						debug!("server: handshake error: {:?}", error);
 						return;
 					}
+				}
+				else {
+					debug!("server: handshake error");
+					return;
 				}
 
 				debug!("server: handshake verified");
 
 				loop {
-					match parse_length_delimited_from::<protocol::clipboard::Change>(&mut conn) {
-						Ok(mut msg) => {
-							debug!("server: received {:?}", msg);
+					if let Ok(mut msg) = parse_length_delimited_from::<protocol::clipboard::Change>(&mut conn) {
+						debug!("server: received {:?}", msg);
 
-							channel.send(Incoming(Arc::new((msg.get_at(),
-								msg.take_content().into_iter()
-								   .map(|mut c| (c.take_format(), c.take_data()))
-								   .collect())))).unwrap();
-						},
-
-						Err(_) => {
-							break;
-						}
+						channel.send(Incoming(Arc::new((msg.get_at(),
+							msg.take_content().into_iter()
+								 .map(|mut c| (c.take_format(), c.take_data()))
+								 .collect())))).unwrap();
+					}
+					else {
+						break;
 					}
 				}
 			});
