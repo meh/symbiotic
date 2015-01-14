@@ -18,9 +18,6 @@
 #![feature(plugin)]
 #![allow(unstable)]
 
-// XXX: remove me when done prototyping
-#![allow(dead_code, unused_variables, unused_imports)]
-
 extern crate protobuf;
 extern crate "rustc-serialize" as rustc_serialize;
 extern crate toml;
@@ -31,12 +28,9 @@ extern crate docopt;
 use std::io::File;
 use std::num::ToPrimitive;
 
-// XXX: remove me
-use std::sync::Arc;
-
 use std::sync::mpsc::channel;
 
-use clipboard::{Change, Message};
+use clipboard::Message;
 use clipboard::Direction::{Incoming, Outgoing};
 
 mod connection;
@@ -136,11 +130,6 @@ fn main() {
 	let (sender, receiver) = channel::<Message>();
 	let connection         = connection::start(sender.clone(), bind, port, peers);
 	let clipboard          = platform::start(sender.clone(), platform);
-
-	// TODO: remove me
-	if mode == Mode::Incoming {
-		clipboard.send(Arc::new((0, vec!(("plain/text".to_string(), vec!(116, 101, 115, 116)))))).unwrap();
-	}
 
 	loop {
 		match receiver.recv().unwrap() {
