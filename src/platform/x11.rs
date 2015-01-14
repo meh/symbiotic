@@ -678,7 +678,7 @@ mod lib {
 						return None;
 					}
 
-					data = Vec::from_raw_buf(buffer as *const u8, (items * ((format / 8) as u64)) as usize);
+					data = Vec::from_raw_buf(buffer as *const u8, (items * ((format / 8) as c_ulong)) as usize);
 
 					XFree(buffer as *mut c_void);
 
