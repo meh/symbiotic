@@ -51,7 +51,7 @@ mod lib {
 	use std::sync::Arc;
 	use std::sync::mpsc::{Sender, Receiver, channel};
 
-	use std::hash::{self, Hash, SipHasher};
+	use std::hash::{self, SipHasher};
 
 	use std::io::timer::sleep;
 	use std::time::duration::Duration;
@@ -344,8 +344,6 @@ mod lib {
 		use std::ffi::c_str_to_bytes;
 		use std::ffi::CString;
 
-		use std::collections::BTreeMap;
-
 		pub type Id     = c_ulong;
 		pub type Atom   = c_ulong;
 		pub type Time   = c_ulong;
@@ -355,13 +353,11 @@ mod lib {
 		pub static PropertyChangeMask: c_long = 1 << 22;
 
 		pub static False: Bool = 0;
-		pub static True: Bool  = 1;
 
 		pub static CurrentTime: Time = 0;
 
 		pub static PropModeReplace: c_int = 0;
 
-		#[derive(Show)]
 		#[repr(C)]
 		pub struct Event {
 			pub kind:    c_int,
@@ -372,7 +368,6 @@ mod lib {
 			_data: [u64; 23us]
 		}
 
-		#[derive(Show)]
 		#[repr(C)]
 		pub struct SelectionNotify {
 			pub requestor: Id,
@@ -382,7 +377,6 @@ mod lib {
 			pub time:      Time,
 		}
 
-		#[derive(Show)]
 		#[repr(C)]
 		pub struct SelectionClear {
 			pub window:    Id,
@@ -390,7 +384,6 @@ mod lib {
 			pub time:      Time,
 		}
 
-		#[derive(Show)]
 		#[repr(C)]
 		pub struct SelectionRequest {
 			pub owner:     Id,
