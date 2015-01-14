@@ -18,12 +18,10 @@
 extern crate openssl;
 extern crate protobuf;
 
-use std::sync::Arc;
 use std::thread::Thread;
 use std::sync::mpsc::{Sender, channel};
 
-use std::io::{TcpListener, TcpStream};
-use std::io::{Acceptor, Listener};
+use std::io::TcpStream;
 
 use std::io::timer::sleep;
 use std::time::duration::Duration;
@@ -34,11 +32,11 @@ use self::openssl::ssl::SslVerifyMode::SslVerifyPeer;
 
 use protocol;
 
-use self::protobuf::{Message, RepeatedField};
-use self::protobuf::core::parse_length_delimited_from;
-use self::protobuf::stream::{CodedInputStream};
+use self::protobuf::Message;
 
 use clipboard;
+
+use super::Peer;
 
 fn identity() -> protocol::handshake::Identity {
 	let mut msg = protocol::handshake::Identity::new();
@@ -52,26 +50,33 @@ fn identity() -> protocol::handshake::Identity {
 	msg
 }
 
-pub fn start(host: String) -> Sender<clipboard::Change> {
+pub fn start(peer: Peer) -> Sender<clipboard::Change> {
 	let (sender, receiver) = channel::<clipboard::Change>();
 
 	Thread::spawn(move || -> () {
 		loop {
-			let mut conn = match TcpStream::connect(host.as_slice()) {
-				Ok(conn) => {
-					conn
-				},
+			let mut conn;
 
-				Err(_) => {
-					sleep(Duration::seconds(1));
-					continue
-				},
-			};
+			if let Ok(c) = TcpStream::connect((peer.ip.as_slice(), peer.port)) {
+				conn = c;
+			}
+			else {
+				sleep(Duration::seconds(1));
+				continue
+			}
 
 			debug!("client: connected");
 
-			conn.set_nodelay(true).unwrap();
-			conn.close_read().unwrap();
+			let mut ctx = SslContext::new(Sslv23).unwrap();
+
+			ctx.set_cipher_list("DEFAULT");
+
+			if let Some(ref cert) = peer.cert {
+				ctx.set_verify(SslVerifyPeer, None);
+				ctx.set_CA_file(cert);
+			}
+
+			let mut conn = SslStream::new(&ctx, conn).unwrap();
 
 			debug!("client: sending handshake");
 

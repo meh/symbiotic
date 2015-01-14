@@ -33,6 +33,9 @@ use std::sync::mpsc::channel;
 use clipboard::Message;
 use clipboard::Direction::{Incoming, Outgoing};
 
+use connection::Peer;
+use std::default::Default;
+
 mod connection;
 mod platform;
 mod clipboard;
@@ -62,9 +65,8 @@ fn main() {
 		Outgoing,
 	}
 
-	let mut peers:    Vec<String>         = vec!();
-	let mut bind:     String              = "0.0.0.0".to_string();
-	let mut port:     u16                 = 23421;
+	let mut peers:    Vec<Peer>           = vec!();
+	let mut host:     Peer                = Default::default();
 	let mut platform: Option<toml::Value> = None;
 	let mut mode:     Mode                = Mode::Both;
 
@@ -79,20 +81,6 @@ fn main() {
 				panic!("{}: file not found", path)
 		};
 
-		if let Some(h) = config.get("peers") {
-			peers = h.as_slice().unwrap().iter()
-			         .map(|x| x.as_str().unwrap().to_string())
-			         .collect::<Vec<String>>();
-		}
-
-		if let Some(p) = config.get("port") {
-			port = p.as_integer().unwrap().to_u16().unwrap();
-		}
-
-		if let Some(b) = config.get("bind") {
-			bind = b.as_str().unwrap().to_string();
-		}
-
 		if let Some(m) = config.get("mode") {
 			mode = match m.as_str().unwrap() {
 				"both"     => Mode::Both,
@@ -103,19 +91,73 @@ fn main() {
 			};
 		}
 
+		if let Some(ip) = config.get("ip") {
+			host.ip = ip.as_str().unwrap().to_string();
+		}
+
+		if let Some(port) = config.get("port") {
+			host.port = port.as_integer().unwrap().to_u16().unwrap();
+		}
+
+		if let Some(cert) = config.get("cert") {
+			host.cert = Some(Path::new(cert.as_str().unwrap()));
+		}
+
+		if let Some(key) = config.get("key") {
+			host.key = Some(Path::new(key.as_str().unwrap()));
+		}
+
+		if let Some(table) = config.get("connection") {
+			for value in table.as_table().unwrap().values() {
+				let     table      = value.as_table().unwrap();
+				let mut peer: Peer = Default::default();
+
+				if let Some(ip) = table.get("ip") {
+					peer.ip = ip.as_str().unwrap().to_string();
+				}
+
+				if let Some(port) = table.get("port") {
+					peer.port = port.as_integer().unwrap().to_u16().unwrap();
+				}
+
+				if let Some(cert) = table.get("cert") {
+					peer.cert = Some(Path::new(cert.as_str().unwrap()));
+				}
+
+				if let Some(key) = table.get("key") {
+					peer.key = Some(Path::new(key.as_str().unwrap()));
+				}
+
+				peers.push(peer);
+			}
+		}
+
 		platform = config.get("platform").map(|p| p.clone());
 	}
 	else {
-		if let Some(p) = args.arg_peers {
-			peers = p;
-		}
-
 		if let Some(p) = args.flag_port {
-			port = p;
+			host.port = p;
 		}
 
 		if let Some(b) = args.flag_bind {
-			bind = b;
+			host.ip = b;
+		}
+
+		if let Some(p) = args.arg_peers {
+			for string in p.iter() {
+				let mut peer: Peer = Default::default();
+				let mut parts      = string.as_slice().split(':');
+
+				if let Some(ip) = parts.next() {
+					peer.ip = ip.to_string();
+				}
+
+				if let Some(port) = parts.next() {
+					peer.port = port.parse().unwrap();
+				}
+
+				peers.push(peer);
+			}
 		}
 
 		if args.flag_incoming {
@@ -128,7 +170,7 @@ fn main() {
 	}
 
 	let (sender, receiver) = channel::<Message>();
-	let connection         = connection::start(sender.clone(), bind, port, peers);
+	let connection         = connection::start(sender.clone(), host, peers);
 	let clipboard          = platform::start(sender.clone(), platform);
 
 	loop {

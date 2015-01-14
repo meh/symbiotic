@@ -1,6 +1,14 @@
-port  = 42231
-hosts = ["192.168.1.2", "192.168.1.3"]
-mode  = "both" # "outgoing" and "incoming" are the alternatives
+mode = "both" # "outgoing" and "incoming" are the alternatives
+ip   = "0.0.0.0"
+port = 42231
+
+[connection.a]
+ip   = "192.168.1.2"
+port = 23421
+
+[connection.b]
+ip   = "192.168.1.3"
+port = 23423
 
 [platform]
 display = ":0.0"

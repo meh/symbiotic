@@ -22,24 +22,28 @@ use std::sync::Arc;
 use std::thread::Thread;
 use std::sync::mpsc::Sender;
 
-use std::io::{TcpListener, TcpStream};
+use std::io::TcpListener;
 use std::io::{Acceptor, Listener};
-
-use std::io::timer::sleep;
-use std::time::duration::Duration;
+use std::io::{File, Open, Write};
+use std::io::TempDir;
 
 use self::openssl::ssl::SslMethod::Sslv23;
 use self::openssl::ssl::{SslContext, SslStream};
-use self::openssl::ssl::SslVerifyMode::SslVerifyPeer;
+use self::openssl::ssl::SslVerifyMode::{SslVerifyNone, SslVerifyPeer};
+use self::openssl::x509::{X509FileType, X509Generator};
+use self::openssl::x509::KeyUsage::DigitalSignature;
+use self::openssl::crypto::hash::HashType::SHA256;
 
 use protocol;
 
-use protobuf::{Message, RepeatedField};
+use protobuf::Message;
 use protobuf::core::parse_length_delimited_from;
 use protobuf::stream::{CodedInputStream};
 
 use clipboard;
 use clipboard::Direction::Incoming;
+
+use super::Peer;
 
 fn verify(msg: &protocol::handshake::Identity) -> bool {
 	if msg.get_name().as_slice() != "clipboard" {
@@ -61,61 +65,115 @@ fn verify(msg: &protocol::handshake::Identity) -> bool {
 	true
 }
 
-pub fn start(main: Sender<clipboard::Message>, bind: String, port: u16, peers: Vec<String>) {
+pub fn start(channel: Sender<clipboard::Message>, host: Peer, peers: Vec<Peer>) {
 	Thread::spawn(move || -> () {
-		let     listener = TcpListener::bind((bind.as_slice(), port));
+		let     listener = TcpListener::bind((host.ip.as_slice(), host.port));
 		let mut acceptor = listener.listen();
 
 		for conn in acceptor.incoming() {
-			let main = main.clone();
+			if conn.is_err() {
+				continue;
+			}
 
-			if let Ok(conn) = conn {
-				Thread::spawn(move || -> () {
-					let mut conn = conn;
+			let mut conn = conn.unwrap();
+			let     peer = peers.iter().find(|p|
+				p.ip == format!("{}", conn.peer_name().unwrap().ip));
 
-					debug!("server: connected");
+			if peer.is_none() {
+				continue;
+			}
 
-					conn.set_nodelay(true).unwrap();
-					conn.close_write().unwrap();
+			let peer    = peer.unwrap().clone();
+			let host    = host.clone();
+			let channel = channel.clone();
 
-					let mut input = CodedInputStream::new(&mut conn);
+			Thread::spawn(move || -> () {
+				debug!("server: connected");
 
-					debug!("server: fo shizzle");
+				let mut ctx = SslContext::new(Sslv23).unwrap();
 
-					match parse_length_delimited_from::<protocol::handshake::Identity>(&mut input) {
-						Ok(msg) => {
-							if !verify(&msg) {
-								debug!("server: handshake invalid");
+				ctx.set_cipher_list("DEFAULT");
 
-								return;
-							}
-						},
+				if let Some(ref cert) = host.cert {
+					ctx.set_certificate_file(cert, X509FileType::PEM);
+					ctx.set_private_key_file(&host.key.unwrap(), X509FileType::PEM);
+				}
+				else {
+					let gen = X509Generator::new()
+			 	 	          .set_bitlength(2048)
+			 	 	          .set_valid_period(365*2)
+			 	 	          .set_CN("Symbiote Inc.")
+			 	 	          .set_sign_hash(SHA256)
+			 	 	          .set_usage(&[DigitalSignature]);
 
-						Err(error) => {
-							debug!("server: handshake error: {:?}", error);
+					let (cert, key) = gen.generate().unwrap();
+
+					let dir  = TempDir::new("symbiotic").unwrap();
+					let path = dir.into_inner();
+
+					let mut cert_path = path.clone();
+					        cert_path.push("cert.pem");
+
+					let mut file = File::open_mode(&cert_path, Open, Write).unwrap();
+					cert.write_pem(&mut file).unwrap();
+
+					let mut key_path = path.clone();
+					        key_path.push("key.pem");
+
+					let mut file = File::open_mode(&key_path, Open, Write).unwrap();
+					key.write_pem(&mut file).unwrap();
+
+					ctx.set_certificate_file(&cert_path, X509FileType::PEM);
+					ctx.set_private_key_file(&key_path, X509FileType::PEM);
+				}
+
+				if let Some(ref cert) = peer.cert {
+					ctx.set_verify(SslVerifyPeer, None);
+					ctx.set_CA_file(cert);
+				}
+				else {
+					ctx.set_verify(SslVerifyNone, None);
+				}
+
+				let mut conn = SslStream::new_server(&ctx, conn).unwrap();
+				let mut conn = CodedInputStream::new(&mut conn);
+
+				debug!("server: fo shizzle");
+
+				match parse_length_delimited_from::<protocol::handshake::Identity>(&mut conn) {
+					Ok(msg) => {
+						if !verify(&msg) {
+							debug!("server: handshake invalid");
+
 							return;
 						}
+					},
+
+					Err(error) => {
+						debug!("server: handshake error: {:?}", error);
+						return;
 					}
+				}
 
-					debug!("server: handshake verified");
+				debug!("server: handshake verified");
 
-					loop {
-						match parse_length_delimited_from::<protocol::clipboard::Change>(&mut input) {
-							Ok(mut msg) => {
-								debug!("server: received {:?}", msg);
-								//ipc.send(Incoming(Arc::new((msg.get_id(), msg.take_format(), msg.take_data()))));
-							},
+				loop {
+					match parse_length_delimited_from::<protocol::clipboard::Change>(&mut conn) {
+						Ok(mut msg) => {
+							debug!("server: received {:?}", msg);
 
-							Err(_) => {
-								break;
-							}
+							channel.send(Incoming(Arc::new((msg.get_at(),
+								msg.take_content().into_iter()
+								   .map(|mut c| (c.take_format(), c.take_data()))
+								   .collect())))).unwrap();
+						},
+
+						Err(_) => {
+							break;
 						}
 					}
-				});
-			}
-			else {
-				continue
-			}
+				}
+			});
 		}
 	});
 }

@@ -18,41 +18,56 @@
 extern crate regex;
 
 use std::sync::mpsc::{Sender, SendError};
-
-use self::regex::Regex;
+use std::default::Default;
 
 use clipboard;
 
 mod incoming;
 mod outgoing;
 
+#[derive(Clone)]
+pub struct Peer {
+	pub ip:   String,
+	pub port: u16,
+
+	pub cert: Option<Path>,
+	pub key:  Option<Path>,
+}
+
+impl Default for Peer {
+	fn default() -> Self {
+		Peer {
+			ip:   "0.0.0.0".to_string(),
+			port: 23421,
+
+			cert: None,
+			key:  None,
+		}
+	}
+}
+
 pub struct Broadcast(Vec<Sender<clipboard::Change>>);
 
 impl Broadcast {
 	pub fn send(&self, change: clipboard::Change) -> Result<(), SendError<clipboard::Change>> {
-		println!("{:?}", change);
+		debug!("broadcast: {:?}", change);
 
 		for chan in self.0.iter() {
-			if let error@Err(..) = chan.send(change.clone()) {
-				return error;
-			}
+			try!(chan.send(change.clone()));
 		}
 
 		Ok(())
 	}
 }
 
-pub fn start(main: Sender<clipboard::Message>, bind: String, port: u16, peers: Vec<String>) -> Broadcast {
+pub fn start(main: Sender<clipboard::Message>, host: Peer, peers: Vec<Peer>) -> Broadcast {
 	let mut broadcast = vec!();
-	let mut ips       = vec!();
 
 	for peer in peers.iter() {
 		broadcast.push(outgoing::start(peer.clone()));
-
-		ips.push(Regex::new(r"^(.*?)(:\d+)?$").unwrap().captures(peer.as_slice()).unwrap().at(1).unwrap().to_string());
 	}
 
-	incoming::start(main, bind, port, ips);
+	incoming::start(main, host, peers);
 
 	Broadcast(broadcast)
 }
