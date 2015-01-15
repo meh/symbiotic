@@ -11,6 +11,9 @@ rustc-serialize = "0.2.0"
 [dependencies.protobuf]
 git = "https://github.com/stepancheg/rust-protobuf.git"
 
+[dependencies.docopt]
+git = "https://github.com/docopt/docopt.rs.git"
+
 [dependencies.docopt_macros]
 git = "https://github.com/docopt/docopt.rs.git"
 

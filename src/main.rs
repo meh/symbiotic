@@ -22,7 +22,7 @@ extern crate protobuf;
 extern crate "rustc-serialize" as rustc_serialize;
 extern crate toml;
 extern crate docopt;
-#[plugin] extern crate docopt_macros;
+#[plugin] #[no_link] extern crate docopt_macros;
 #[macro_use] extern crate log;
 
 use std::io::File;
