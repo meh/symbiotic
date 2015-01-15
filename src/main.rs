@@ -36,6 +36,7 @@ use clipboard::Direction::{Incoming, Outgoing};
 use connection::Peer;
 use std::default::Default;
 
+mod utils;
 mod connection;
 mod platform;
 mod clipboard;

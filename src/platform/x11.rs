@@ -58,6 +58,8 @@ mod lib {
 
 	use std::collections::BTreeMap;
 
+	use utils;
+
 	use clipboard;
 	use clipboard::Direction::Outgoing;
 
@@ -107,7 +109,7 @@ mod lib {
 		}
 
 		pub fn serve(&self, receiver: &Receiver<clipboard::Change>) -> Option<clipboard::Change> {
-			if let Some(c) = self.flush(receiver) {
+			if let Some(c) = utils::flush(receiver) {
 				let mut change = c;
 
 				self.window.selection_owner(self.intern(self.source.as_slice()), x::CurrentTime);
@@ -116,11 +118,11 @@ mod lib {
 					let event = self.display.next_event();
 
 					if let Some(..) = event.details::<x::SelectionClear>() {
-						return self.flush(receiver);
+						return utils::flush(receiver);
 					}
 
 					if let Some(details) = event.details::<x::SelectionRequest>() {
-						if let Some(c) = self.flush(receiver) {
+						if let Some(c) = utils::flush(receiver) {
 							change = c;
 						}
 
@@ -166,24 +168,6 @@ mod lib {
 			}
 
 			None
-		}
-
-		fn flush(&self, receiver: &Receiver<clipboard::Change>) -> Option<clipboard::Change> {
-			if let Ok(c) = receiver.try_recv() {
-				let mut change = c;
-
-				loop {
-					if let Ok(c) = receiver.try_recv() {
-						change = c;
-					}
-					else {
-						return Some(change);
-					}
-				}
-			}
-			else {
-				return None;
-			}
 		}
 
 		fn set<T>(&self, details: &x::SelectionRequest, data: &Vec<T>) {
