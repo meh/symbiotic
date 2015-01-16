@@ -229,8 +229,9 @@ mod lib {
 
 					if Regex::new(r"^(.*?)/(.*?)$").unwrap().is_match(name.as_slice()) {
 						if let Some(value) = self.get(name.as_slice()) {
-							content.insert(name.clone(),
-								value.items::<u8>().unwrap().to_vec());
+							if let Some(items) = value.items::<u8>() {
+								content.insert(name.clone(), items.to_vec());
+							}
 						}
 					}
 					else {
