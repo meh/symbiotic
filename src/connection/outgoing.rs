@@ -30,12 +30,11 @@ use self::openssl::ssl::SslMethod::Sslv23;
 use self::openssl::ssl::{SslContext, SslStream};
 use self::openssl::ssl::SslVerifyMode::SslVerifyPeer;
 
-use protocol;
-
 use self::protobuf::Message;
 
+use protocol;
 use clipboard;
-
+use utils;
 use super::Peer;
 
 fn identity() -> protocol::handshake::Identity {
@@ -85,6 +84,8 @@ pub fn start(peer: Peer) -> Sender<clipboard::Change> {
 			}
 
 			debug!("client: sent handshake: {:?}", identity());
+
+			utils::flush(&receiver);
 
 			loop {
 				debug!("client: waiting for message");
