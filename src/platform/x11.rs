@@ -209,10 +209,9 @@ mod lib {
 		}
 
 		pub fn poll(&mut self) -> Option<clipboard::Change> {
-			static mut hash:      u64 = 0;
-			static mut timestamp: u64 = 0;
+			static mut hash: u64 = 0;
 
-			let mut current: u64 = 0;
+			let mut timestamp: u64 = 0;
 			let mut content: BTreeMap<String, Vec<u8>> = BTreeMap::new();
 			
 			if let Some(property) = self.get("UTF8_STRING") {
@@ -236,7 +235,7 @@ mod lib {
 					}
 					else {
 						if let "TIMESTAMP" = name.as_slice() {
-							current = self.get("TIMESTAMP").unwrap().items::<u32>().unwrap()[0] as u64;
+							timestamp = self.get("TIMESTAMP").unwrap().items::<u32>().unwrap()[0] as u64;
 						}
 					}
 				}
@@ -247,31 +246,20 @@ mod lib {
 			}
 
 			unsafe {
-				if current != 0 {
-					hash = 0;
+				let mut current: u64 = 0;
 
-					if current == timestamp {
-						return None;
-					}
-
-					timestamp = current;
+				for (ref key, ref value) in content.iter() {
+					current = hash::hash::<_, SipHasher>(&(current, key, value));
 				}
-				else {
-					timestamp = 0;
 
-					for (ref key, ref value) in content.iter() {
-						current = hash::hash::<_, SipHasher>(&(current, key, value));
-					}
-
-					if current == hash {
-						return None;
-					}
-
-					hash = current;
+				if current == hash {
+					return None;
 				}
+
+				hash = current;
 			}
 
-			Some(Arc::new((unsafe { timestamp }, content.into_iter().collect())))
+			Some(Arc::new((timestamp, content.into_iter().collect())))
 		}
 
 		fn intern(&self, name: &str) -> x::Atom {
