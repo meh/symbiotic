@@ -23,5 +23,11 @@ git = "https://github.com/alexcrichton/toml-rs.git"
 [dependencies.openssl]
 git = "https://github.com/sfackler/rust-openssl.git"
 
+[target.x86_64-pc-windows-gnu.dependencies.image]
+git = "https://github.com/PistonDevelopers/image.git"
+
+[target.i686-pc-windows-gnu.dependencies.image]
+git = "https://github.com/PistonDevelopers/image.git"
+
 [[bin]]
 name = "symbiotic-clipboard"
