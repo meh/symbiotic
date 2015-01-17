@@ -209,9 +209,10 @@ mod lib {
 		}
 
 		pub fn poll(&mut self) -> Option<clipboard::Change> {
-			static mut hash: u64 = 0;
+			static mut hash:      u64 = 0;
+			static mut timestamp: u64 = 0;
 
-			let mut timestamp: u64 = 0;
+			let mut t: u64 = 0;
 			let mut content: BTreeMap<String, Vec<u8>> = BTreeMap::new();
 			
 			if let Some(property) = self.get("UTF8_STRING") {
@@ -236,7 +237,7 @@ mod lib {
 					}
 					else {
 						if let "TIMESTAMP" = name.as_slice() {
-							timestamp = self.get("TIMESTAMP").unwrap().items::<u32>().unwrap()[0] as u64;
+							t = self.get("TIMESTAMP").unwrap().items::<u32>().unwrap()[0] as u64;
 						}
 					}
 				}
@@ -244,6 +245,16 @@ mod lib {
 
 			if content.len() == 0 {
 				return None;
+			}
+
+			unsafe {
+				if t != 0 {
+					if t == timestamp {
+						return None;
+					}
+
+					timestamp = t;
+				}
 			}
 
 			unsafe {
@@ -260,7 +271,7 @@ mod lib {
 				hash = current;
 			}
 
-			Some(Arc::new((timestamp, content.into_iter().collect())))
+			Some(Arc::new((t, content.into_iter().collect())))
 		}
 
 		fn intern(&self, name: &str) -> x::Atom {
