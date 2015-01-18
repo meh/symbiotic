@@ -32,6 +32,8 @@ use std::num::ToPrimitive;
 
 use std::sync::mpsc::channel;
 
+use regex::Regex;
+
 use clipboard::Message;
 use clipboard::Direction::{Incoming, Outgoing};
 
@@ -55,10 +57,37 @@ Options:
   -p, --port PORT    Port to listen on (default 23421).
   -c, --config PATH  Path to the config file.
 
+  -l, --limit SIZE   Maximum size of the clipboard data to send.
+  -f, --filter MIME  List of ':' separated mime types to ignore.
+
   -i, --incoming     Only receive clipboard changes.
   -o, --outgoing     Only send clipboard changes.
 ", flag_bind: Option<String>, flag_port: Option<u16>, flag_config: Option<String>,
+   flag_limit: Option<String>, flag_filter: Option<String>,
    arg_peers: Option<Vec<String>>);
+
+fn human(string: &str) -> usize {
+	let c = regex!(r"^(\d+)(KMGT)?$").captures(string).unwrap();
+	let n = c.at(0).unwrap().parse::<usize>().unwrap();
+
+	match c.at(1) {
+		None      => n,
+		Some("K") => n * 1024,
+		Some("M") => n * 1024 * 1024,
+		Some("G") => n * 1024 * 1024 * 1024,
+		Some("T") => n * 1024 * 1024 * 1024 * 1024,
+
+		_ => panic!("unknown size")
+	}
+}
+
+fn wildcard(string: &str) -> Regex {
+	let string = regex!(r"([\\+*?[^\]$(){}=!<>|:-])").replace(string, "\\$1");
+	let string = regex!(r"\\\*").replace(string.as_slice(), ".*?");
+	let string = regex!(r"\\\?").replace(string.as_slice(), ".");
+
+	Regex::new(string.as_slice()).unwrap()
+}
 
 fn main() {
 	#[derive(PartialEq, Eq)]
@@ -72,6 +101,8 @@ fn main() {
 	let mut host:     Peer                = Default::default();
 	let mut platform: Option<toml::Value> = None;
 	let mut mode:     Mode                = Mode::Both;
+	let mut limit:    usize               = 0;
+	let mut filter:   Vec<String>         = vec!();
 
 	let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
 
@@ -108,6 +139,14 @@ fn main() {
 
 		if let Some(key) = config.get("key") {
 			host.key = Some(Path::new(key.as_str().unwrap()));
+		}
+
+		if let Some(l) = config.get("limit") {
+			limit = human(l.as_str().unwrap())
+		}
+
+		if let Some(f) = config.get("filter") {
+			filter = f.as_str().unwrap().split(':').map(|s| s.to_string()).collect();
 		}
 
 		if let Some(table) = config.get("connection") {
@@ -163,6 +202,14 @@ fn main() {
 			}
 		}
 
+		if let Some(l) = args.flag_limit {
+			limit = human(l.as_slice())
+		}
+
+		if let Some(f) = args.flag_filter {
+			filter = f.split(':').map(|s| s.to_string()).collect();
+		}
+
 		if args.flag_incoming {
 			mode = Mode::Incoming;
 		}
@@ -184,8 +231,24 @@ fn main() {
 				}
 			},
 
-			Outgoing(change) => {
+			Outgoing(mut change) => {
 				if mode != Mode::Incoming {
+					{
+						let &mut (_, ref mut content) = change.make_unique();
+
+						if !filter.is_empty() {
+							for wc in filter.iter() {
+								let wc = wildcard(wc.as_slice());
+
+								content.retain(|&(ref mime, _)| !wc.is_match(mime.as_slice()));
+							}
+						}
+
+						if limit > 0 {
+							content.retain(|&(_, ref content)| content.len() < limit);
+						}
+					}
+
 					connection.send(change).unwrap();
 				}
 			}

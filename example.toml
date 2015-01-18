@@ -2,6 +2,9 @@ mode = "both" # "outgoing" and "incoming" are the alternatives
 ip   = "0.0.0.0"
 port = 42231
 
+filter = ["image/*"]
+limit  = "1M"
+
 [connection.a]
 ip   = "192.168.1.2"
 port = 23421
