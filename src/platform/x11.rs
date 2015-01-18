@@ -45,8 +45,6 @@ pub fn start(channel: Sender<clipboard::Message>, specs: Option<toml::Value>) ->
 mod lib {
 	extern crate regex;
 
-	use self::regex::Regex;
-
 	use std::thread::Thread;
 	use std::sync::Arc;
 	use std::sync::mpsc::{Sender, Receiver, channel};
@@ -150,7 +148,7 @@ mod lib {
 								}
 							},
 
-							name if Regex::new(r"^(.*?)/(.*?)$").unwrap().is_match(name) => {
+							name if regex!(r"^(.*?)/(.*?)$").is_match(name) => {
 								if let Some(value) = content.get(name) {
 									self.set(details, value);
 								}
@@ -228,7 +226,7 @@ mod lib {
 				for atom in property.items::<x::Atom>().unwrap().iter() {
 					let name = self.name(*atom);
 
-					if Regex::new(r"^(.*?)/(.*?)$").unwrap().is_match(name.as_slice()) {
+					if regex!(r"^(.*?)/(.*?)$").is_match(name.as_slice()) {
 						if let Some(value) = self.get(name.as_slice()) {
 							if let Some(items) = value.items::<u8>() {
 								content.insert(name.clone(), items.to_vec());

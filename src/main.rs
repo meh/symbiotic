@@ -24,6 +24,8 @@ extern crate toml;
 extern crate docopt;
 #[plugin] #[no_link] extern crate docopt_macros;
 #[macro_use] extern crate log;
+#[plugin] #[no_link] extern crate regex_macros;
+extern crate regex;
 
 use std::io::File;
 use std::num::ToPrimitive;
