@@ -85,6 +85,7 @@ fn wildcard(string: &str) -> Regex {
 	let string = regex!(r"([\\+*?[^\]$(){}=!<>|:-])").replace(string, "\\$1");
 	let string = regex!(r"\\\*").replace(string.as_slice(), ".*?");
 	let string = regex!(r"\\\?").replace(string.as_slice(), ".");
+	let string = format!("^{}$", string);
 
 	Regex::new(string.as_slice()).unwrap()
 }
