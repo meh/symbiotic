@@ -332,13 +332,13 @@ mod lib {
 		pub type Bool   = c_int;
 		pub type Status = c_int;
 
-		pub static PropertyChangeMask: c_long = 1 << 22;
+		pub const PropertyChangeMask: c_long = 1 << 22;
 
-		pub static False: Bool = 0;
+		pub const False: Bool = 0;
 
-		pub static CurrentTime: Time = 0;
+		pub const CurrentTime: Time = 0;
 
-		pub static PropModeReplace: c_int = 0;
+		pub const PropModeReplace: c_int = 0;
 
 		#[repr(C)]
 		pub struct Event {
