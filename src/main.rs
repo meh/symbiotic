@@ -83,11 +83,11 @@ fn human(string: &str) -> usize {
 
 fn wildcard(string: &str) -> Regex {
 	let string = regex!(r"([\\+*?[^\]$(){}=!<>|:-])").replace(string, "\\$1");
-	let string = regex!(r"\\\*").replace(string.as_slice(), ".*?");
-	let string = regex!(r"\\\?").replace(string.as_slice(), ".");
+	let string = regex!(r"\\\*").replace(&string[], ".*?");
+	let string = regex!(r"\\\?").replace(&string[], ".");
 	let string = format!("^{}$", string);
 
-	Regex::new(string.as_slice()).unwrap()
+	Regex::new(&string[]).unwrap()
 }
 
 fn main() {
@@ -108,9 +108,9 @@ fn main() {
 	let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
 
 	if let Some(path) = args.flag_config {
-		let config = match File::open(&Path::new(path.as_slice())).read_to_string() {
+		let config = match File::open(&Path::new(&path[])).read_to_string() {
 			Ok(content) =>
-				toml::Parser::new(content.as_slice()).parse().unwrap(),
+				toml::Parser::new(&content[]).parse().unwrap(),
 
 			Err(..) =>
 				panic!("{}: file not found", path)
@@ -189,7 +189,7 @@ fn main() {
 		if let Some(p) = args.arg_peers {
 			for string in p.iter() {
 				let mut peer: Peer = Default::default();
-				let mut parts      = string.as_slice().split(':');
+				let mut parts      = (&string[]).split(':');
 
 				if let Some(ip) = parts.next() {
 					peer.ip = ip.to_string();
@@ -204,7 +204,7 @@ fn main() {
 		}
 
 		if let Some(l) = args.flag_limit {
-			limit = human(l.as_slice())
+			limit = human(&l[])
 		}
 
 		if let Some(f) = args.flag_filter {
@@ -239,9 +239,9 @@ fn main() {
 
 						if !filter.is_empty() {
 							for wc in filter.iter() {
-								let wc = wildcard(wc.as_slice());
+								let wc = wildcard(&wc[]);
 
-								content.retain(|&(ref mime, _)| !wc.is_match(mime.as_slice()));
+								content.retain(|&(ref mime, _)| !wc.is_match(&mime[]));
 							}
 						}
 

@@ -56,7 +56,7 @@ pub fn start(peer: Peer) -> Sender<clipboard::Change> {
 		loop {
 			let mut conn;
 
-			if let Ok(c) = TcpStream::connect((peer.ip.as_slice(), peer.port)) {
+			if let Ok(c) = TcpStream::connect((&peer.ip[], peer.port)) {
 				conn = c;
 			}
 			else {

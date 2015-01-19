@@ -46,7 +46,7 @@ use clipboard::Direction::Incoming;
 use super::Peer;
 
 fn verify(msg: &protocol::handshake::Identity) -> bool {
-	if msg.get_name().as_slice() != "clipboard" {
+	if &msg.get_name()[] != "clipboard" {
 		return false;
 	}
 
@@ -67,7 +67,7 @@ fn verify(msg: &protocol::handshake::Identity) -> bool {
 
 pub fn start(channel: Sender<clipboard::Message>, host: Peer, peers: Vec<Peer>) {
 	Thread::spawn(move || -> () {
-		let     listener = TcpListener::bind((host.ip.as_slice(), host.port));
+		let     listener = TcpListener::bind((&host.ip[], host.port));
 		let mut acceptor = listener.listen();
 
 		for conn in acceptor.incoming() {

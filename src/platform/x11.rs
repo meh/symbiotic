@@ -110,7 +110,7 @@ mod lib {
 			if let Some(c) = utils::flush(receiver) {
 				let mut change = c;
 
-				self.window.selection_owner(self.intern(self.source.as_slice()), x::CurrentTime);
+				self.window.selection_owner(self.intern(&self.source[]), x::CurrentTime);
 
 				loop {
 					let event = self.display.next_event();
@@ -127,10 +127,10 @@ mod lib {
 						let name    = self.name(details.target);
 						let content = change.1.clone().into_iter().collect::<BTreeMap<String, Vec<u8>>>();
 
-						match name.as_slice() {
+						match &name[] {
 							"TARGETS" => {
 								let mut targets: Vec<x::Atom> =
-									content.keys().map(|mime| self.intern(mime.as_slice())).collect();
+									content.keys().map(|mime| self.intern(&mime[])).collect();
 
 								if content.contains_key("text/plain") {
 									targets.push(self.intern("UTF8_STRING"));
@@ -170,7 +170,7 @@ mod lib {
 
 		fn set<T>(&self, details: &x::SelectionRequest, data: &Vec<T>) {
 			let window = self.display.window(details.requestor);
-			let kind   = match self.name(details.target).as_slice() {
+			let kind   = match &self.name(details.target)[] {
 				"TARGETS" => self.intern("ATOM"),
 				name      => self.intern(name)
 			};
@@ -180,7 +180,7 @@ mod lib {
 				let notify = event.mut_details::<x::SelectionNotify>();
 
 				notify.requestor = details.requestor;
-				notify.selection = self.intern(self.source.as_slice());
+				notify.selection = self.intern(&self.source[]);
 				notify.target    = details.target;
 				notify.property  = details.property;
 				notify.time      = details.time;
@@ -197,7 +197,7 @@ mod lib {
 				let notify = event.mut_details::<x::SelectionNotify>();
 
 				notify.requestor = details.requestor;
-				notify.selection = self.intern(self.source.as_slice());
+				notify.selection = self.intern(&self.source[]);
 				notify.target    = details.target;
 				notify.property  = 0;
 				notify.time      = details.time;
@@ -226,15 +226,15 @@ mod lib {
 				for atom in property.items::<x::Atom>().unwrap().iter() {
 					let name = self.name(*atom);
 
-					if regex!(r"^(.*?)/(.*?)$").is_match(name.as_slice()) {
-						if let Some(value) = self.get(name.as_slice()) {
+					if regex!(r"^(.*?)/(.*?)$").is_match(&name[]) {
+						if let Some(value) = self.get(&name[]) {
 							if let Some(items) = value.items::<u8>() {
 								content.insert(name.clone(), items.to_vec());
 							}
 						}
 					}
 					else {
-						if let "TIMESTAMP" = name.as_slice() {
+						if let "TIMESTAMP" = &name[] {
 							t = self.get("TIMESTAMP").unwrap().items::<u32>().unwrap()[0] as u64;
 						}
 					}
@@ -284,7 +284,7 @@ mod lib {
 			let id = self.intern("SYMBIOTIC");
 
 			self.window.convert_selection(
-				self.intern(self.source.as_slice()),
+				self.intern(&self.source[]),
 				self.intern(name),
 				id);
 
