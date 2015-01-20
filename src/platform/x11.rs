@@ -21,9 +21,14 @@ use std::sync::mpsc::Sender;
 
 use clipboard;
 
+pub enum Mode {
+	Selection,
+	Clipboard,
+}
+
 pub fn start(channel: Sender<clipboard::Message>, specs: Option<toml::Value>) -> Sender<clipboard::Change> {
 	let mut display = None;
-	let mut source  = "PRIMARY".to_string();
+	let mut mode    = Mode::Selection;
 
 	if let Some(table) = specs {
 		if let Some(value) = table.lookup("display") {
@@ -31,15 +36,15 @@ pub fn start(channel: Sender<clipboard::Message>, specs: Option<toml::Value>) ->
 		}
 
 		if let Some(value) = table.lookup("mode") {
-			source = match value.as_str().unwrap() {
-				"selection" => "PRIMARY".to_string(),
-				"clipboard" => "CLIPBOARD".to_string(),
+			mode = match value.as_str().unwrap() {
+				"selection" => Mode::Selection,
+				"clipboard" => Mode::Clipboard,
 				value       => panic!("unknown source type: {}", value),
 			};
 		}
 	}
 
-	lib::Manager::start(channel, display, source)
+	lib::Manager::start(channel, display, mode)
 }
 
 mod lib {
@@ -48,6 +53,8 @@ mod lib {
 	use std::thread::Thread;
 	use std::sync::Arc;
 	use std::sync::mpsc::{Sender, Receiver, channel};
+
+	use std::collections::HashMap;
 
 	use std::hash::{self, SipHasher};
 
@@ -60,23 +67,29 @@ mod lib {
 
 	use clipboard;
 	use clipboard::Direction::Outgoing;
+	use super::Mode;
 
 	pub struct Manager {
 		display: x::Display,
-		source:  String,
 		window:  x::Window,
+
+		mode:   Mode,
+		source: x::Atom,
+
+		atoms: HashMap<String, x::Atom>,
+		names: HashMap<x::Atom, String>,
 
 		channel: Sender<clipboard::Message>,
 	}
 
 	#[allow(non_snake_case)]
 	impl Manager {
-		pub fn start(main: Sender<clipboard::Message>, display: Option<String>, source: String) -> Sender<clipboard::Change> {
+		pub fn start(main: Sender<clipboard::Message>, display: Option<String>, mode: Mode) -> Sender<clipboard::Change> {
 			let display            = x::Display::open(display.as_ref()).unwrap();
 			let (sender, receiver) = channel::<clipboard::Change>();
 
 			Thread::spawn(move || -> () {
-				let mut manager = Manager::new(main, display, source);
+				let mut manager = Manager::new(main, display, mode);
 
 				loop {
 					if let None = manager.serve(&receiver) {
@@ -93,24 +106,34 @@ mod lib {
 			sender
 		}
 
-		pub fn new(main: Sender<clipboard::Message>, display: x::Display, source: String) -> Manager {
+		pub fn new(main: Sender<clipboard::Message>, display: x::Display, mode: Mode) -> Manager {
 			let window = x::Window::open(&display, &display.root(), (0, 0), (1, 1), (0, 0), 0);
+			let source = match mode {
+				Mode::Selection => display.intern_atom("PRIMARY"),
+				Mode::Clipboard => display.intern_atom("CLIPBOARD"),
+			};
 
 			window.select(x::PropertyChangeMask);
 
 			Manager {
-				channel: main,
 				display: display,
-				source:  source,
 				window:  window,
+
+				source: source,
+				mode:   mode,
+
+				atoms: HashMap::new(),
+				names: HashMap::new(),
+
+				channel: main,
 			}
 		}
 
-		pub fn serve(&self, receiver: &Receiver<clipboard::Change>) -> Option<clipboard::Change> {
+		pub fn serve(&mut self, receiver: &Receiver<clipboard::Change>) -> Option<clipboard::Change> {
 			if let Some(c) = utils::flush(receiver) {
 				let mut change = c;
 
-				self.window.selection_owner(self.intern(&self.source[]), x::CurrentTime);
+				self.window.selection_owner(self.source, x::CurrentTime);
 
 				loop {
 					let event = self.display.next_event();
@@ -168,7 +191,7 @@ mod lib {
 			None
 		}
 
-		fn set<T>(&self, details: &x::SelectionRequest, data: &Vec<T>) {
+		fn set<T>(&mut self, details: &x::SelectionRequest, data: &Vec<T>) {
 			let window = self.display.window(details.requestor);
 			let kind   = match &self.name(details.target)[] {
 				"TARGETS" => self.intern("ATOM"),
@@ -180,7 +203,7 @@ mod lib {
 				let notify = event.mut_details::<x::SelectionNotify>();
 
 				notify.requestor = details.requestor;
-				notify.selection = self.intern(&self.source[]);
+				notify.selection = details.selection;
 				notify.target    = details.target;
 				notify.property  = details.property;
 				notify.time      = details.time;
@@ -190,14 +213,14 @@ mod lib {
 			window.send(&event);
 		}
 
-		fn error(&self, details: &x::SelectionRequest) {
+		fn error(&mut self, details: &x::SelectionRequest) {
 			let     window = self.display.window(details.requestor);
 			let mut event  = self.display.event();
 			{
 				let notify = event.mut_details::<x::SelectionNotify>();
 
 				notify.requestor = details.requestor;
-				notify.selection = self.intern(&self.source[]);
+				notify.selection = details.selection;
 				notify.target    = details.target;
 				notify.property  = 0;
 				notify.time      = details.time;
@@ -272,21 +295,43 @@ mod lib {
 			Some(Arc::new((t, content.into_iter().collect())))
 		}
 
-		fn intern(&self, name: &str) -> x::Atom {
-			self.display.intern_atom(name)
+		fn intern(&mut self, name: &str) -> x::Atom {
+			let mut atom = 0;
+
+			if let Some(a) = self.atoms.get(&name.to_string()) {
+				atom = *a
+			}
+
+			if atom == 0 {
+				atom = self.display.intern_atom(name);
+
+				self.atoms.insert(name.to_string(), atom);
+			}
+
+			atom
 		}
 
-		fn name(&self, atom: x::Atom) -> String {
-			self.display.atom_name(atom)
+		fn name(&mut self, atom: x::Atom) -> String {
+			let mut name = "None".to_string();
+
+			if let Some(n) = self.names.get(&atom) {
+				name = n.clone();
+			}
+
+			if &name[] == "None" {
+				name = self.display.atom_name(atom);
+
+				self.names.insert(atom, name.clone());
+			}
+
+			name
 		}
 
-		fn get(&self, name: &str) -> Option<x::Property> {
-			let id = self.intern("SYMBIOTIC");
+		fn get(&mut self, name: &str) -> Option<x::Property> {
+			let id     = self.intern("SYMBIOTIC");
+			let target = self.intern(name);
 
-			self.window.convert_selection(
-				self.intern(&self.source[]),
-				self.intern(name),
-				id);
+			self.window.convert_selection(self.source, target, id);
 
 			loop {
 				let event = self.display.next_event();
