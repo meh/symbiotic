@@ -54,8 +54,6 @@ mod lib {
 	use std::sync::Arc;
 	use std::sync::mpsc::{Sender, Receiver, channel};
 
-	use std::collections::HashMap;
-
 	use std::hash::{self, SipHasher};
 
 	use std::io::timer::sleep;
@@ -76,20 +74,17 @@ mod lib {
 		mode:   Mode,
 		source: x::Atom,
 
-		atoms: HashMap<String, x::Atom>,
-		names: HashMap<x::Atom, String>,
-
 		channel: Sender<clipboard::Message>,
 	}
 
 	#[allow(non_snake_case)]
 	impl Manager {
 		pub fn start(main: Sender<clipboard::Message>, display: Option<String>, mode: Mode) -> Sender<clipboard::Change> {
-			let display            = x::Display::open(display.as_ref()).unwrap();
 			let (sender, receiver) = channel::<clipboard::Change>();
 
 			Thread::spawn(move || -> () {
-				let mut manager = Manager::new(main, display, mode);
+				let display = x::Display::open(display.as_ref()).unwrap();
+				let manager = Manager::new(main, display, mode);
 
 				loop {
 					if let None = manager.serve(&receiver) {
@@ -122,14 +117,19 @@ mod lib {
 				source: source,
 				mode:   mode,
 
-				atoms: HashMap::new(),
-				names: HashMap::new(),
-
 				channel: main,
 			}
 		}
 
-		pub fn serve(&mut self, receiver: &Receiver<clipboard::Change>) -> Option<clipboard::Change> {
+		fn intern(&self, name: &str) -> x::Atom {
+			self.display.intern(name)
+		}
+
+		fn atom(&self, atom: x::Atom) -> String {
+			self.display.atom(atom)
+		}
+
+		pub fn serve(&self, receiver: &Receiver<clipboard::Change>) -> Option<clipboard::Change> {
 			if let Some(c) = utils::flush(receiver) {
 				let mut change = c;
 
@@ -147,7 +147,7 @@ mod lib {
 							change = c;
 						}
 
-						let name    = self.name(details.target);
+						let name    = self.atom(details.target);
 						let content = change.1.clone().into_iter().collect::<BTreeMap<String, Vec<u8>>>();
 
 						match &name[] {
@@ -191,9 +191,9 @@ mod lib {
 			None
 		}
 
-		fn set<T>(&mut self, details: &x::SelectionRequest, data: &Vec<T>) {
+		fn set<T>(&self, details: &x::SelectionRequest, data: &Vec<T>) {
 			let window = self.display.window(details.requestor);
-			let kind   = match &self.name(details.target)[] {
+			let kind   = match &self.atom(details.target)[] {
 				"TARGETS" => self.intern("ATOM"),
 				name      => self.intern(name)
 			};
@@ -213,7 +213,7 @@ mod lib {
 			window.send(&event);
 		}
 
-		fn error(&mut self, details: &x::SelectionRequest) {
+		fn error(&self, details: &x::SelectionRequest) {
 			let     window = self.display.window(details.requestor);
 			let mut event  = self.display.event();
 			{
@@ -229,7 +229,7 @@ mod lib {
 			window.send(&event);
 		}
 
-		pub fn poll(&mut self) -> Option<clipboard::Change> {
+		pub fn poll(&self) -> Option<clipboard::Change> {
 			static mut hash:      u64 = 0;
 			static mut timestamp: u64 = 0;
 
@@ -247,7 +247,7 @@ mod lib {
 
 			if let Some(property) = self.get("TARGETS") {
 				for atom in property.items::<x::Atom>().unwrap().iter() {
-					let name = self.name(*atom);
+					let name = self.atom(*atom);
 
 					if regex!(r"^(.*?)/(.*?)$").is_match(&name[]) {
 						if let Some(value) = self.get(&name[]) {
@@ -295,39 +295,7 @@ mod lib {
 			Some(Arc::new((t, content.into_iter().collect())))
 		}
 
-		fn intern(&mut self, name: &str) -> x::Atom {
-			let mut atom = 0;
-
-			if let Some(a) = self.atoms.get(&name.to_string()) {
-				atom = *a
-			}
-
-			if atom == 0 {
-				atom = self.display.intern_atom(name);
-
-				self.atoms.insert(name.to_string(), atom);
-			}
-
-			atom
-		}
-
-		fn name(&mut self, atom: x::Atom) -> String {
-			let mut name = "None".to_string();
-
-			if let Some(n) = self.names.get(&atom) {
-				name = n.clone();
-			}
-
-			if &name[] == "None" {
-				name = self.display.atom_name(atom);
-
-				self.names.insert(atom, name.clone());
-			}
-
-			name
-		}
-
-		fn get(&mut self, name: &str) -> Option<x::Property> {
+		fn get(&self, name: &str) -> Option<x::Property> {
 			let id     = self.intern("SYMBIOTIC");
 			let target = self.intern(name);
 
@@ -360,6 +328,7 @@ mod lib {
 		extern crate libc;
 
 		use self::libc::{c_void, c_int, c_uint, c_ulong, c_long, c_uchar};
+		use std::collections::HashMap;
 
 		use std::ops::Drop;
 
@@ -367,6 +336,7 @@ mod lib {
 		use std::mem;
 		use std::intrinsics::type_id;
 		use std::slice;
+		use std::cell::RefCell;
 
 		use std::ffi::c_str_to_bytes;
 		use std::ffi::CString;
@@ -511,6 +481,9 @@ mod lib {
 
 		pub struct Display {
 			pointer: *const c_void,
+
+			atoms: RefCell<HashMap<String, Atom>>,
+			names: RefCell<HashMap<Atom, String>>,
 		}
 
 		pub struct Window {
@@ -556,11 +529,15 @@ mod lib {
 				};
 
 				if pointer.is_null() {
-					None
+					return None;
 				}
-				else {
-					Some(Display { pointer: pointer })
-				}
+
+				Some(Display {
+					pointer: pointer,
+
+					atoms: RefCell::new(HashMap::new()),
+					names: RefCell::new(HashMap::new()),
+				})
 			}
 
 			pub fn root(&self) -> Window {
@@ -593,6 +570,18 @@ mod lib {
 				event.display = self.pointer;
 
 				return event;
+			}
+
+			pub fn intern(&self, name: &str) -> Atom {
+				if let Some(atom) = self.atoms.borrow_mut().get(&name.to_string()) {
+					return *atom;
+				}
+
+				let atom = self.intern_atom(name);
+
+				self.atoms.borrow_mut().insert(name.to_string(), atom);
+
+				atom
 			}
 
 			pub fn intern_atom(&self, name: &str) -> Atom {
@@ -637,6 +626,18 @@ mod lib {
 				}
 			}
 
+			pub fn atom(&self, atom: Atom) -> String {
+				if let Some(name) = self.names.borrow_mut().get(&atom) {
+					return name.clone();
+				}
+
+				let name = self.atom_name(atom);
+
+				self.names.borrow_mut().insert(atom, name.clone());
+
+				name
+			}
+
 			pub fn atom_name(&self, id: Atom) -> String {
 				if id == 0 {
 					return "None".to_string();
@@ -652,8 +653,6 @@ mod lib {
 				}
 			}
 		}
-
-		unsafe impl Send for Display { }
 
 		impl Drop for Display {
 			fn drop(&mut self) {
