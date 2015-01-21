@@ -21,6 +21,7 @@ use std::sync::mpsc::Sender;
 
 use clipboard;
 
+#[derive(Eq, PartialEq, Copy)]
 pub enum Mode {
 	Selection,
 	Clipboard,
@@ -53,6 +54,7 @@ mod lib {
 	use std::thread::Thread;
 	use std::sync::Arc;
 	use std::sync::mpsc::{Sender, Receiver, channel};
+	use std::cell::Cell;
 
 	use std::hash::{self, SipHasher};
 
@@ -60,6 +62,7 @@ mod lib {
 	use std::time::duration::Duration;
 
 	use std::collections::BTreeMap;
+	use std::default::Default;
 
 	use utils;
 
@@ -71,10 +74,25 @@ mod lib {
 		display: x::Display,
 		window:  x::Window,
 
-		mode:   Mode,
-		source: x::Atom,
+		mode:      Mode,
+		primary:   State,
+		clipboard: State,
 
 		channel: Sender<clipboard::Message>,
+	}
+
+	struct State {
+		hash:      Cell<u64>,
+		timestamp: Cell<u64>,
+	}
+
+	impl Default for State {
+		fn default() -> Self {
+			State {
+				hash:      Cell::new(0),
+				timestamp: Cell::new(0),
+			}
+		}
 	}
 
 	#[allow(non_snake_case)]
@@ -103,10 +121,6 @@ mod lib {
 
 		pub fn new(main: Sender<clipboard::Message>, display: x::Display, mode: Mode) -> Manager {
 			let window = x::Window::open(&display, &display.root(), (0, 0), (1, 1), (0, 0), 0);
-			let source = match mode {
-				Mode::Selection => display.intern_atom("PRIMARY"),
-				Mode::Clipboard => display.intern_atom("CLIPBOARD"),
-			};
 
 			window.select(x::PropertyChangeMask);
 
@@ -114,8 +128,9 @@ mod lib {
 				display: display,
 				window:  window,
 
-				source: source,
-				mode:   mode,
+				mode:      mode,
+				primary:   Default::default(),
+				clipboard: Default::default(),
 
 				channel: main,
 			}
@@ -130,16 +145,36 @@ mod lib {
 		}
 
 		pub fn serve(&self, receiver: &Receiver<clipboard::Change>) -> Option<clipboard::Change> {
-			if let Some(c) = utils::flush(receiver) {
-				let mut change = c;
+			let mut change;
 
-				self.window.selection_owner(self.source, x::CurrentTime);
+			if let Some(c) = utils::flush(receiver) {
+				let clipboard = self.intern("CLIPBOARD");
+
+				self.window.own_selection(match self.mode {
+					Mode::Selection => self.intern("PRIMARY"),
+					Mode::Clipboard => self.intern("CLIPBOARD")
+				});
+
+				if self.mode == Mode::Selection {
+					self.window.own_selection(self.intern("CLIPBOARD"))
+				}
+
+				change = c;
 
 				loop {
 					let event = self.display.next_event();
 
-					if let Some(..) = event.details::<x::SelectionClear>() {
-						return utils::flush(receiver);
+					if let Some(details) = event.details::<x::SelectionClear>() {
+						if self.mode == Mode::Selection {
+							if details.selection != clipboard {
+								self.window.disown_selection(self.intern("CLIPBOARD"));
+
+								return utils::flush(receiver);
+							}
+						}
+						else {
+							return utils::flush(receiver);
+						}
 					}
 
 					if let Some(details) = event.details::<x::SelectionRequest>() {
@@ -230,36 +265,46 @@ mod lib {
 		}
 
 		pub fn poll(&self) -> Option<clipboard::Change> {
-			static mut hash:      u64 = 0;
-			static mut timestamp: u64 = 0;
+			match self.mode {
+				Mode::Selection =>
+					self.selection(Mode::Selection).or(self.selection(Mode::Clipboard)),
 
-			let mut t: u64 = 0;
-			let mut content: BTreeMap<String, Vec<u8>> = BTreeMap::new();
-			
-			if let Some(property) = self.get("UTF8_STRING") {
+				Mode::Clipboard =>
+					self.selection(Mode::Clipboard)
+			}
+		}
+
+		fn selection(&self, mode: Mode) -> Option<clipboard::Change> {
+			let mut timestamp: u64                       = 0;
+			let mut content:   BTreeMap<String, Vec<u8>> = BTreeMap::new();
+
+			let (selection, state) = match mode {
+				Mode::Selection => (self.intern("PRIMARY"),   &self.primary),
+				Mode::Clipboard => (self.intern("CLIPBOARD"), &self.clipboard),
+			};
+
+			if let Some(property) = self.get("UTF8_STRING", selection) {
 				content.insert("text/plain".to_string(),
 					property.items::<u8>().unwrap().to_vec());
 			}
-			else if let Some(property) = self.get("STRING") {
+			else if let Some(property) = self.get("STRING", selection) {
 				content.insert("text/plain".to_string(),
 					property.items::<u8>().unwrap().to_vec());
 			}
 
-			if let Some(property) = self.get("TARGETS") {
+			if let Some(property) = self.get("TARGETS", selection) {
 				for atom in property.items::<x::Atom>().unwrap().iter() {
 					let name = self.atom(*atom);
 
 					if regex!(r"^(.*?)/(.*?)$").is_match(&name[]) {
-						if let Some(value) = self.get(&name[]) {
+						if let Some(value) = self.get(&name[], selection) {
 							if let Some(items) = value.items::<u8>() {
 								content.insert(name.clone(), items.to_vec());
 							}
 						}
 					}
-					else {
-						if let "TIMESTAMP" = &name[] {
-							t = self.get("TIMESTAMP").unwrap().items::<u32>().unwrap()[0] as u64;
-						}
+					else if "TIMESTAMP" == &name[] {
+						timestamp = self.get("TIMESTAMP", selection).unwrap().items::<u32>().unwrap()[0] as u64;
 					}
 				}
 			}
@@ -268,38 +313,34 @@ mod lib {
 				return None;
 			}
 
-			unsafe {
-				if t != 0 {
-					if t == timestamp {
-						return None;
-					}
-
-					timestamp = t;
-				}
-			}
-
-			unsafe {
-				let mut current: u64 = 0;
-
-				for (ref key, ref value) in content.iter() {
-					current = hash::hash::<_, SipHasher>(&(current, key, value));
-				}
-
-				if current == hash {
+			if timestamp != 0 {
+				if timestamp == state.timestamp.get() {
 					return None;
 				}
 
-				hash = current;
+				state.timestamp.set(timestamp);
 			}
 
-			Some(Arc::new((t, content.into_iter().collect())))
+			let mut hash: u64 = 0;
+
+			for (ref key, ref value) in content.iter() {
+				hash = hash::hash::<_, SipHasher>(&(hash, key, value));
+			}
+
+			if hash == state.hash.get() {
+				return None;
+			}
+
+			state.hash.set(hash);
+
+			Some(Arc::new((timestamp, content.into_iter().collect())))
 		}
 
-		fn get(&self, name: &str) -> Option<x::Property> {
+		fn get(&self, name: &str, selection: x::Atom) -> Option<x::Property> {
 			let id     = self.intern("SYMBIOTIC");
 			let target = self.intern(name);
 
-			self.window.convert_selection(self.source, target, id);
+			self.window.convert_selection(selection, target, id);
 
 			loop {
 				let event = self.display.next_event();
@@ -747,9 +788,15 @@ mod lib {
 				}
 			}
 
-			pub fn selection_owner(&self, selection: Atom, time: Time) {
+			pub fn own_selection(&self, selection: Atom) {
 				unsafe {
-					XSetSelectionOwner(self.display, selection, self.id, time);
+					XSetSelectionOwner(self.display, selection, self.id, CurrentTime);
+				}
+			}
+
+			pub fn disown_selection(&self, selection: Atom) {
+				unsafe {
+					XSetSelectionOwner(self.display, selection, 0, CurrentTime);
 				}
 			}
 		}
