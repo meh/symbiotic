@@ -154,7 +154,7 @@ mod win {
 			}
 		}
 
-		unsafe fn get(&self) -> HGLOBAL {
+		pub unsafe fn get(&self) -> HGLOBAL {
 			self.0
 		}
 
