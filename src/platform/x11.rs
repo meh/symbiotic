@@ -257,8 +257,9 @@ mod lib {
 		}
 
 		fn error(&self, details: &x::SelectionRequest) {
-			let     window = self.display.window(details.requestor);
-			let mut event  = self.display.event();
+			let window = self.display.window(details.requestor);
+
+			let mut event = self.display.event();
 			{
 				let notify = event.mut_details::<x::SelectionNotify>();
 
