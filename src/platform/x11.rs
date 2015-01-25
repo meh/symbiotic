@@ -182,8 +182,9 @@ mod lib {
 							change = c;
 						}
 
-						let name    = self.atom(details.target);
-						let content = change.1.clone().into_iter().collect::<BTreeMap<String, Vec<u8>>>();
+						let name      = self.atom(details.target);
+						let timestamp = change.0;
+						let content   = change.1.clone().into_iter().collect::<BTreeMap<String, Vec<u8>>>();
 
 						match &name[] {
 							"TARGETS" => {
@@ -194,7 +195,14 @@ mod lib {
 									targets.push(self.intern("UTF8_STRING"));
 								}
 
+								targets.push(self.intern("TARGETS"));
+								targets.push(self.intern("TIMESTAMP"));
+
 								self.set(details, &targets);
+							},
+
+							"TIMESTAMP" => {
+								self.set(details, &vec![timestamp]);
 							},
 
 							"UTF8_STRING" | "STRING" => {
