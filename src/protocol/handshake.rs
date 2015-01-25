@@ -189,8 +189,8 @@ impl ::protobuf::Message for Version {
         &mut self.unknown_fields
     }
 
-    fn type_id(&self) -> ::std::intrinsics::TypeId {
-        ::std::intrinsics::TypeId::of::<Version>()
+    fn type_id(&self) -> ::std::any::TypeId {
+        ::std::any::TypeId::of::<Version>()
     }
 
     fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
@@ -255,7 +255,7 @@ impl ::std::cmp::PartialEq for Version {
     }
 }
 
-impl ::std::fmt::Show for Version {
+impl ::std::fmt::Debug for Version {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
@@ -439,8 +439,8 @@ impl ::protobuf::Message for Identity {
         &mut self.unknown_fields
     }
 
-    fn type_id(&self) -> ::std::intrinsics::TypeId {
-        ::std::intrinsics::TypeId::of::<Identity>()
+    fn type_id(&self) -> ::std::any::TypeId {
+        ::std::any::TypeId::of::<Identity>()
     }
 
     fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
@@ -498,7 +498,7 @@ impl ::std::cmp::PartialEq for Identity {
     }
 }
 
-impl ::std::fmt::Show for Identity {
+impl ::std::fmt::Debug for Identity {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }

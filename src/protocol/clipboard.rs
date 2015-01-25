@@ -186,8 +186,8 @@ impl ::protobuf::Message for Content {
         &mut self.unknown_fields
     }
 
-    fn type_id(&self) -> ::std::intrinsics::TypeId {
-        ::std::intrinsics::TypeId::of::<Content>()
+    fn type_id(&self) -> ::std::any::TypeId {
+        ::std::any::TypeId::of::<Content>()
     }
 
     fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
@@ -245,7 +245,7 @@ impl ::std::cmp::PartialEq for Content {
     }
 }
 
-impl ::std::fmt::Show for Content {
+impl ::std::fmt::Debug for Content {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
@@ -394,8 +394,8 @@ impl ::protobuf::Message for Change {
         &mut self.unknown_fields
     }
 
-    fn type_id(&self) -> ::std::intrinsics::TypeId {
-        ::std::intrinsics::TypeId::of::<Change>()
+    fn type_id(&self) -> ::std::any::TypeId {
+        ::std::any::TypeId::of::<Change>()
     }
 
     fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
@@ -452,7 +452,7 @@ impl ::std::cmp::PartialEq for Change {
     }
 }
 
-impl ::std::fmt::Show for Change {
+impl ::std::fmt::Debug for Change {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
