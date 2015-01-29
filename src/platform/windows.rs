@@ -21,7 +21,7 @@ use std::thread::Thread;
 use std::sync::mpsc::{Sender, channel};
 use std::sync::Arc;
 
-use std::io::timer::sleep;
+use std::old_io::timer::sleep;
 use std::time::duration::Duration;
 
 use clipboard;
@@ -88,7 +88,7 @@ mod win {
 	use std::ffi::c_str_to_bytes;
 	use std::ffi::CString;
 
-	use std::io::ByRefWriter;
+	use std::old_io::ByRefWriter;
 
 	use std::ptr;
 	use std::mem;

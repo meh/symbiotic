@@ -21,9 +21,9 @@ extern crate protobuf;
 use std::thread::Thread;
 use std::sync::mpsc::{Sender, channel};
 
-use std::io::TcpStream;
+use std::old_io::TcpStream;
 
-use std::io::timer::sleep;
+use std::old_io::timer::sleep;
 use std::time::duration::Duration;
 
 use self::openssl::ssl::SslMethod::Sslv23;

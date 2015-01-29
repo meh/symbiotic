@@ -22,17 +22,17 @@ use std::sync::Arc;
 use std::thread::Thread;
 use std::sync::mpsc::Sender;
 
-use std::io::TcpListener;
-use std::io::{Acceptor, Listener};
-use std::io::{File, Open, Write};
-use std::io::TempDir;
+use std::old_io::TcpListener;
+use std::old_io::{Acceptor, Listener};
+use std::old_io::{File, Open, Write};
+use std::old_io::TempDir;
 
 use self::openssl::ssl::SslMethod::Sslv23;
 use self::openssl::ssl::{SslContext, SslStream};
 use self::openssl::ssl::SslVerifyMode::{SslVerifyNone, SslVerifyPeer};
 use self::openssl::x509::{X509FileType, X509Generator};
 use self::openssl::x509::KeyUsage::DigitalSignature;
-use self::openssl::crypto::hash::HashType::SHA256;
+use self::openssl::crypto::hash::Type::SHA256;
 
 use protocol;
 

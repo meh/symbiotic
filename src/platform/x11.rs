@@ -58,7 +58,7 @@ mod lib {
 
 	use std::hash::{self, SipHasher};
 
-	use std::io::timer::sleep;
+	use std::old_io::timer::sleep;
 	use std::time::duration::Duration;
 
 	use std::collections::BTreeMap;

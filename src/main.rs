@@ -15,19 +15,28 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-#![feature(plugin)]
-#![allow(unstable)]
+#![feature(plugin, core, collections, alloc, path, io, std_misc, libc, hash, unicode)]
+#![allow(unused_feature)]
 
 extern crate protobuf;
+
 extern crate "rustc-serialize" as rustc_serialize;
+
 extern crate toml;
+
+#[plugin] #[no_link]
+extern crate docopt_macros;
 extern crate docopt;
-#[plugin] #[no_link] extern crate docopt_macros;
-#[macro_use] extern crate log;
-#[plugin] #[no_link] extern crate regex_macros;
+
+#[macro_use]
+extern crate log;
+extern crate env_logger;
+
+#[plugin] #[no_link]
+extern crate regex_macros;
 extern crate regex;
 
-use std::io::File;
+use std::old_io::File;
 use std::num::ToPrimitive;
 
 use std::sync::mpsc::channel;
@@ -219,6 +228,8 @@ fn main() {
 			mode = Mode::Outgoing;
 		}
 	}
+
+	env_logger::init().unwrap();
 
 	let (sender, receiver) = channel::<Message>();
 	let connection         = connection::start(sender.clone(), host, peers);
