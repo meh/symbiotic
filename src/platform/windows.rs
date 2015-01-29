@@ -70,7 +70,10 @@ pub fn start(main: Sender<clipboard::Message>, _: Option<toml::Value>) -> Sender
 					if hash != previous {
 						previous = hash;
 
-						main.send(Outgoing(Arc::new((sequence as clipboard::Timestamp, content)))).unwrap();
+						main.send(Outgoing(Arc::new((
+							sequence as clipboard::Timestamp,
+							content.into_iter().collect()
+						)))).unwrap();
 					}
 				}
 			}
@@ -81,7 +84,6 @@ pub fn start(main: Sender<clipboard::Message>, _: Option<toml::Value>) -> Sender
 }
 
 #[allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
-#[feature(unicode)]
 mod win {
 	extern crate libc;
 	extern crate unicode;
@@ -546,7 +548,7 @@ mod win {
 			}
 		}
 
-		pub fn get(&self) -> BTreeMap<(String, Vec<u8>)> {
+		pub fn get(&self) -> BTreeMap<String, Vec<u8>> {
 			let mut result = BTreeMap::new();
 
 			unsafe {
