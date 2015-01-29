@@ -15,8 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-#![feature(plugin, core, collections, alloc, path, io, std_misc, libc, hash, unicode)]
-#![allow(unused_feature)]
+#![feature(plugin, core, collections, alloc, path, io, std_misc, libc, hash)]
 
 extern crate protobuf;
 

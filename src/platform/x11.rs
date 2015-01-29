@@ -56,8 +56,6 @@ mod lib {
 	use std::sync::mpsc::{Sender, Receiver, channel};
 	use std::cell::Cell;
 
-	use std::hash::{self, SipHasher};
-
 	use std::old_io::timer::sleep;
 	use std::time::duration::Duration;
 
@@ -330,11 +328,7 @@ mod lib {
 				state.timestamp.set(timestamp);
 			}
 
-			let mut hash: u64 = 0;
-
-			for (ref key, ref value) in content.iter() {
-				hash = hash::hash::<_, SipHasher>(&(hash, key, value));
-			}
+			let hash = utils::hash(&content);
 
 			if hash == state.hash.get() {
 				return None;

@@ -34,6 +34,7 @@ pub fn start(main: Sender<clipboard::Message>, _: Option<toml::Value>) -> Sender
 
 	Thread::spawn(move || -> () {
 		let mut sequence = win::sequence();
+		let mut previous = 0u64;
 
 		loop {
 			if let Some(change) = utils::flush(&receiver) {
@@ -63,8 +64,14 @@ pub fn start(main: Sender<clipboard::Message>, _: Option<toml::Value>) -> Sender
 
 				{
 					let clipboard = win::Clipboard::open();
+					let content   = clipboard.get();
+					let hash      = utils::hash(&content);
 
-					main.send(Outgoing(Arc::new((sequence as clipboard::Timestamp, clipboard.get())))).unwrap();
+					if hash != previous {
+						previous = hash;
+
+						main.send(Outgoing(Arc::new((sequence as clipboard::Timestamp, content)))).unwrap();
+					}
 				}
 			}
 		}
@@ -74,10 +81,13 @@ pub fn start(main: Sender<clipboard::Message>, _: Option<toml::Value>) -> Sender
 }
 
 #[allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
+#[feature(unicode)]
 mod win {
 	extern crate libc;
 	extern crate unicode;
 	extern crate image;
+
+	use std::collections::BTreeMap;
 
 	use self::image::{GenericImage, ImageFormat, Rgba};
 	use self::image::DynamicImage::{ImageLuma8, ImageLumaA8, ImageRgb8, ImageRgba8};
@@ -536,8 +546,8 @@ mod win {
 			}
 		}
 
-		pub fn get(&self) -> Vec<(String, Vec<u8>)> {
-			let mut result = vec!();
+		pub fn get(&self) -> BTreeMap<(String, Vec<u8>)> {
+			let mut result = BTreeMap::new();
 
 			unsafe {
 				let mut format = 0;
@@ -553,10 +563,10 @@ mod win {
 
 					match &self.name(format)[] {
 						"CF_UNICODETEXT" => {
-							result.push(("text/plain".to_string(),
+							result.insert("text/plain".to_string(),
 								String::from_utf16(
 									slice::from_raw_buf(
-										&(*lock as *const u16), strlen(*lock))).unwrap().as_bytes().to_vec()));
+										&(*lock as *const u16), strlen(*lock))).unwrap().as_bytes().to_vec());
 						},
 
 						"CF_DIB" => {
@@ -587,19 +597,19 @@ mod win {
 								let mut data: Vec<u8> = vec!();
 
 								if let Ok(..) = ImageRgba8(buf).save(data.by_ref(), image::PNG) {
-									result.push(("image/png".to_string(), data));
+									result.insert("image/png".to_string(), data);
 								}
 							}
 						},
 
 						name if name.starts_with("text/") => {
-							result.push((name.to_string(),
-								slice::from_raw_buf(&(*lock as *const u8), strlen(*lock) * 2).to_vec()));
+							result.insert(name.to_string(),
+								slice::from_raw_buf(&(*lock as *const u8), strlen(*lock) * 2).to_vec());
 						},
 
 						name if regex!(r"^(.*?)/(.*?)$").is_match(name) => {
-							result.push((name.to_string(),
-								slice::from_raw_buf(&(*lock as *const u8), handle.size()).to_vec()));
+							result.insert(name.to_string(),
+								slice::from_raw_buf(&(*lock as *const u8), handle.size()).to_vec());
 						},
 
 						_ => {}

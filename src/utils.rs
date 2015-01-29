@@ -16,6 +16,8 @@
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
 use std::sync::mpsc::Receiver;
+use std::hash::{self, SipHasher};
+use std::collections::BTreeMap;
 
 pub fn flush<T: Send>(channel: &Receiver<T>) -> Option<T> {
 	if let Ok(v) = channel.try_recv() {
@@ -33,4 +35,14 @@ pub fn flush<T: Send>(channel: &Receiver<T>) -> Option<T> {
 	else {
 		return None;
 	}
+}
+
+pub fn hash(content: &BTreeMap<String, Vec<u8>>) -> u64 {
+	let mut hash: u64 = 0;
+
+	for (ref key, ref value) in content.iter() {
+		hash = hash::hash::<_, SipHasher>(&(hash, key, value));
+	}
+
+	hash
 }
