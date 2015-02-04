@@ -54,7 +54,7 @@ mod platform;
 mod clipboard;
 mod protocol;
 
-docopt!(Args derive Show, "
+docopt!(Args derive Debug, "
 Usage: symbiotic-clipboard (-c PATH | --config PATH)
        symbiotic-clipboard [options] <peers>...
        symbiotic-clipboard --help
