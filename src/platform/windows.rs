@@ -101,6 +101,7 @@ mod win {
 	use std::ffi::CString;
 
 	use std::old_io::ByRefWriter;
+	use std::num::SignedInt;
 
 	use std::ptr;
 	use std::mem;
@@ -154,6 +155,8 @@ mod win {
 	const CF_TIFF: UINT            = 6;
 	const CF_UNICODETEXT: UINT     = 13;
 	const CF_WAVE: UINT            = 12;
+
+	const BI_RGB: DWORD = 0x0000;
 
 	struct Global(HGLOBAL);
 
@@ -218,6 +221,13 @@ mod win {
 	}
 
 	#[repr(C)]
+	struct RGB {
+		rgbBlue:  BYTE,
+		rgbGreen: BYTE,
+		rgbRed:   BYTE,
+	}
+
+	#[repr(C)]
 	struct BITMAPINFOHEADER {
 		biSize:          DWORD,
 		biWidth:         LONG,
@@ -268,6 +278,7 @@ mod win {
 		}
 	}
 
+	#[inline(always)]
 	fn strlen(ptr: HANDLE) -> usize {
 		unsafe {
 			let mut length = 0;
@@ -280,6 +291,82 @@ mod win {
 
 			length
 		}
+	}
+
+	struct Pixels<T> {
+		data: *const u8,
+
+		width:   u32,
+		height:  u32,
+		is_top:  bool,
+		padding: u8,
+		size:    u8,
+
+		index:  usize,
+		offset: isize,
+	}
+
+	impl<T> Pixels<T> {
+		pub fn new(lock: &Lock) -> Self {
+			unsafe {
+				let info = &*((**lock) as *mut BITMAPINFOHEADER);
+				let data = (*lock).offset(info.biSize as isize);
+
+				let width  = info.biWidth;
+				let height = info.biHeight;
+				let bits   = info.biBitCount as i32;
+
+				let limit   = ((((width * bits) + 31) as usize) & !31us) >> 3;
+				let padding = limit - ((width * (bits / 8)) as usize);
+
+				Pixels {
+					data: data as *const u8,
+
+					width:   width as u32,
+					height:  height.abs() as u32,
+					is_top:  height < 0,
+					padding: padding as u8,
+					size:    (bits / 8) as u8,
+
+					index:  0,
+					offset: 0,
+				}
+			}
+		}
+	}
+
+	impl<T> Iterator for Pixels<T> {
+		type Item = (T, (u32, u32));
+
+		fn next(&mut self) -> Option<<Self as Iterator>::Item> {
+			if self.index >= self.width as usize * self.height as usize {
+				return None;
+			}
+
+			let     x = (self.index % (self.width as usize)) as u32;
+			let mut y = (self.index / (self.width as usize)) as u32;
+
+			if !self.is_top {
+				y = self.height - y - 1;
+			}
+
+			if self.index != 0 && x == 0 {
+				self.offset += self.padding as isize;
+			}
+
+			let result = unsafe {
+				mem::transmute_copy(&*(self.data.offset(self.offset) as *const T))
+			};
+
+			self.index  += 1;
+			self.offset += self.size as isize;
+
+			Some((result, (x, y)))
+		}
+	}
+
+	fn pixels<T>(lock: &Lock) -> Pixels<T> {
+		Pixels::new(lock)
 	}
 
 	pub struct Clipboard(());
@@ -495,10 +582,11 @@ mod win {
 							info.biSize = mem::size_of::<BITMAPINFOHEADER>() as DWORD;
 
 							info.biWidth  = width as LONG;
-							info.biHeight = height as LONG;
+							info.biHeight = -(height as LONG);
 
-							info.biPlanes   = 1;
-							info.biBitCount = match image {
+							info.biPlanes      = 1;
+							info.biCompression = BI_RGB;
+							info.biBitCount    = match image {
 								ImageLuma8(..)  | ImageRgb8(..)  => 24,
 								ImageLumaA8(..) | ImageRgba8(..) => 32,
 							};
@@ -516,10 +604,6 @@ mod win {
 							let data = slice::from_raw_mut_buf::<RGBQUAD>(&ptr, width * height);
 
 							for (i, &Rgba([r, g, b, a])) in image.to_rgba().pixels().enumerate() {
-								let x = i % width;
-								let y = i / width;
-								let i = ((height - y - 1) * width) + x;
-
 								data[i].rgbBlue     = b;
 								data[i].rgbGreen    = g;
 								data[i].rgbRed      = r;
@@ -574,33 +658,36 @@ mod win {
 						"CF_DIB" => {
 							let info   = &mut (*(*lock as *mut BITMAPINFO)).bmiHeader;
 							let width  = info.biWidth as usize;
-							let height = info.biHeight as usize;
+							let height = info.biHeight.abs() as usize;
 
-							if info.biBitCount == 32 || info.biBitCount == 24 {
-								let     ptr  = (*(*lock as *mut BITMAPINFO)).bmiColors.as_mut_ptr();
-								let     data = slice::from_raw_mut_buf::<RGBQUAD>(&ptr, (width * height) as usize);
-								let mut buf  = image::ImageBuffer::new(width as u32, height as u32);
+							if info.biCompression != BI_RGB {
+								continue;
+							}
 
-								for (i, px) in data.iter().enumerate() {
-									let x = i % width;
-									let y = i / width;
+							let mut buf = image::ImageBuffer::new(width as u32, height as u32);
 
-									match info.biBitCount {
-										32 => buf.put_pixel(x as u32, (height - y - 1) as u32,
-											Rgba([px.rgbRed, px.rgbGreen, px.rgbBlue, px.rgbReserved])),
-
-										24 => buf.put_pixel(x as u32, (height - y - 1) as u32,
-											Rgba([px.rgbRed, px.rgbGreen, px.rgbBlue, 255])),
-
-										_ => {}
+							match info.biBitCount {
+								32 => {
+									for (px, (x, y)) in pixels::<RGBQUAD>(&lock) {
+										buf.put_pixel(x, y,
+											Rgba([px.rgbRed, px.rgbGreen, px.rgbBlue, px.rgbReserved]));
 									}
-								}
+								},
 
-								let mut data: Vec<u8> = vec!();
+								24 => {
+									for (px, (x, y)) in pixels::<RGB>(&lock) {
+										buf.put_pixel(x, y,
+											Rgba([px.rgbRed, px.rgbGreen, px.rgbBlue, 255]));
+									}
+								},
 
-								if let Ok(..) = ImageRgba8(buf).save(data.by_ref(), image::PNG) {
-									result.insert("image/png".to_string(), data);
-								}
+								_ => {}
+							}
+
+							let mut data: Vec<u8> = vec!();
+
+							if let Ok(..) = ImageRgba8(buf).save(data.by_ref(), image::PNG) {
+								result.insert("image/png".to_string(), data);
 							}
 						},
 
@@ -614,7 +701,9 @@ mod win {
 								slice::from_raw_buf(&(*lock as *const u8), handle.size()).to_vec());
 						},
 
-						_ => {}
+						name => {
+							debug!("get: {}", name);
+						}
 					}
 				}
 			}
