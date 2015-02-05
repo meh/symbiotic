@@ -535,7 +535,6 @@ mod lib {
 			id:      Id,
 		}
 
-		#[derive(Show)]
 		pub struct Property<'a> {
 			pub id:   Atom,
 			pub kind: Atom,
