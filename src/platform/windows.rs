@@ -33,13 +33,13 @@ pub fn start(main: Sender<clipboard::Message>, _: Option<toml::Value>) -> Sender
 	let (sender, receiver) = channel::<clipboard::Change>();
 
 	Thread::spawn(move || -> () {
-		let mut sequence = win::sequence();
+		let mut sequence = lib::sequence();
 		let mut previous = 0u64;
 
 		loop {
 			if let Some(change) = utils::flush(&receiver) {
 				{
-					let clipboard = win::Clipboard::open();
+					let clipboard = lib::Clipboard::open();
 
 					clipboard.empty();
 
@@ -48,10 +48,10 @@ pub fn start(main: Sender<clipboard::Message>, _: Option<toml::Value>) -> Sender
 					}
 				}
 
-				sequence = win::sequence();
+				sequence = lib::sequence();
 			}
 			else {
-				let current = win::sequence();
+				let current = lib::sequence();
 
 				if current == sequence {
 					// this could be reduced a bit, but unsure about it
@@ -63,7 +63,7 @@ pub fn start(main: Sender<clipboard::Message>, _: Option<toml::Value>) -> Sender
 				sequence = current;
 
 				{
-					let clipboard = win::Clipboard::open();
+					let clipboard = lib::Clipboard::open();
 					let content   = clipboard.get();
 					let hash      = utils::hash(&content);
 
@@ -84,7 +84,7 @@ pub fn start(main: Sender<clipboard::Message>, _: Option<toml::Value>) -> Sender
 }
 
 #[allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
-mod win {
+mod lib {
 	extern crate libc;
 	extern crate unicode;
 	extern crate image;
