@@ -15,20 +15,15 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(target_os = "linux")]
-mod x11;
+extern crate toml;
 
-#[cfg(target_os = "linux")]
-pub use self::x11::start;
+use clipboard;
+use clipboard::Direction::Outgoing;
 
-#[cfg(target_os = "windows")]
-mod windows;
+use utils;
 
-#[cfg(target_os = "windows")]
-pub use self::windows::start;
+pub fn start(main: Sender<clipboard::Message>, _: Option<toml::Value>) -> Sender<clipboard::Change> {
+	let (sender, receiver) = channel::<clipboard::Change>();
 
-#[cfg(target_os = "macos")]
-mod macos;
-
-#[cfg(target_os = "macos")]
-pub use self::macos::start;
+	sender
+}
