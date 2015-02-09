@@ -249,6 +249,7 @@ mod lib {
 	}
 
 	#[link(name = "kernel32")]
+	#[link_args = "-Wl,--subsystem,windows"]
 	extern "system" {
 		fn GlobalAlloc(uFlags: UINT, dwBytes: SIZE_T) -> HGLOBAL;
 		fn GlobalLock(hMem: HGLOBAL) -> LPVOID;
