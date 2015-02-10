@@ -176,10 +176,6 @@ fn main() {
 					peer.cert = Some(Path::new(cert.as_str().unwrap()));
 				}
 
-				if let Some(key) = table.get("key") {
-					peer.key = Some(Path::new(key.as_str().unwrap()));
-				}
-
 				peers.push(peer);
 			}
 		}
