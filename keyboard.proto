@@ -1,9 +1,25 @@
 package symbiote.protocol.keyboard;
 
-message Press {
-	required uint32 key;
+// Represents the possible message types.
+enum Kind {
+	// Sent on key press.
+	Press = 0;
+
+	// Sent on key release.
+	Release = 1;
+
+	// Sent when messages will start being sent.
+	Enter = 2;
+
+	// Sent when no more messages will be sent.
+	Exit = 3;
 }
 
-message Release {
-	required uint32 key;
+// Tagged union for the various message types.
+message Message {
+	// The message type.
+	required Kind kind = 1;
+
+	// Set to the normalized keycode when it's a Press or Release message.
+	optional uint32 key = 2;
 }
