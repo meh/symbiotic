@@ -495,7 +495,7 @@ mod lib {
 			let handle = match &name[] {
 				n if n.starts_with("text/") => {
 					if data.iter().any(|x| *x == 0) {
-						if unicode::str::is_utf16(unsafe { slice::from_raw_buf(&(data.as_ptr() as *const u16), data.len() / 2) }) {
+						if unicode::str::is_utf16(unsafe { slice::from_raw_parts(&(data.as_ptr() as *const u16), data.len() / 2) }) {
 							debug!("input: {}: utf16", name);
 
 							unsafe {
@@ -652,7 +652,7 @@ mod lib {
 						"CF_UNICODETEXT" => {
 							result.insert("text/plain".to_string(),
 								String::from_utf16(
-									slice::from_raw_buf(
+									slice::from_raw_parts(
 										&(*lock as *const u16), strlen(*lock))).unwrap().as_bytes().to_vec());
 						},
 
@@ -694,12 +694,12 @@ mod lib {
 
 						name if name.starts_with("text/") => {
 							result.insert(name.to_string(),
-								slice::from_raw_buf(&(*lock as *const u8), strlen(*lock) * 2).to_vec());
+								slice::from_raw_parts(&(*lock as *const u8), strlen(*lock) * 2).to_vec());
 						},
 
 						name if regex!(r"^(.*?)/(.*?)$").is_match(name) => {
 							result.insert(name.to_string(),
-								slice::from_raw_buf(&(*lock as *const u8), handle.size()).to_vec());
+								slice::from_raw_parts(&(*lock as *const u8), handle.size()).to_vec());
 						},
 
 						name => {
