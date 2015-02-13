@@ -40,7 +40,7 @@ pub fn flush<T: Send>(channel: &Receiver<T>) -> Option<T> {
 pub fn hash(content: &BTreeMap<String, Vec<u8>>) -> u64 {
 	let mut hash: u64 = 0;
 
-	for (ref key, ref value) in content.iter() {
+	for (ref key, ref value) in content {
 		hash = hash::hash::<_, SipHasher>(&(hash, key, value));
 	}
 
