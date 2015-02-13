@@ -300,7 +300,7 @@ mod lib {
 			}
 
 			if let Some(property) = self.get("TARGETS", selection) {
-				for atom in property.items::<x::Atom>().unwrap().iter() {
+				for atom in property.items::<x::Atom>().unwrap() {
 					let name = self.atom(*atom);
 
 					if regex!(r"^(.*?)/(.*?)$").is_match(&name[]) {
@@ -548,13 +548,13 @@ mod lib {
 			pub fn items<T>(&self) -> Option<&'a [T]> {
 				if self.format == (mem::size_of::<T>() * 8) as i32 {
 					return unsafe {
-						Some(slice::from_raw_parts(mem::transmute(&self.data.as_ptr()), self.items as usize))
+						Some(slice::from_raw_parts(self.data.as_ptr() as *const T, self.items as usize))
 					}
 				}
 
 				if self.format == 32 && mem::size_of::<T>() == 8 {
 					return unsafe {
-						Some(slice::from_raw_parts(mem::transmute(&self.data.as_ptr()), (self.items / 2) as usize))
+						Some(slice::from_raw_parts(self.data.as_ptr() as *const T, (self.items / 2) as usize))
 					}
 				}
 
