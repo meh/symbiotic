@@ -16,24 +16,20 @@
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
 #![feature(plugin, core, collections, alloc, path, io, std_misc, libc, hash, unicode, link_args)]
+#![plugin(docopt_macros, regex_macros)]
 #![allow(unused_features)]
 
 extern crate protobuf;
 
+extern crate docopt;
 extern crate "rustc-serialize" as rustc_serialize;
 
 extern crate toml;
-
-#[plugin] #[no_link]
-extern crate docopt_macros;
-extern crate docopt;
 
 #[macro_use]
 extern crate log;
 extern crate env_logger;
 
-#[plugin] #[no_link]
-extern crate regex_macros;
 extern crate regex;
 
 use std::old_io::File;

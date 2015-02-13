@@ -4,27 +4,21 @@ version = "0.1.0"
 authors = ["meh. <meh@schizofreni.co>"]
 
 [dependencies]
-regex           = "0.1"
-regex_macros    = "0.1"
-rustc-serialize = "0.2"
+regex        = "*"
+regex_macros = "*"
 
-log        = "0.2"
-env_logger = "0.2"
+log        = "*"
+env_logger = "*"
+
+docopt          = "*"
+docopt_macros   = "*"
+rustc-serialize = "*"
+
+toml    = "*"
+openssl = "*"
 
 [dependencies.protobuf]
 git = "https://github.com/stepancheg/rust-protobuf.git"
-
-[dependencies.docopt]
-git = "https://github.com/docopt/docopt.rs.git"
-
-[dependencies.docopt_macros]
-git = "https://github.com/docopt/docopt.rs.git"
-
-[dependencies.toml]
-git = "https://github.com/alexcrichton/toml-rs.git"
-
-[dependencies.openssl]
-git = "https://github.com/sfackler/rust-openssl.git"
 
 [target.x86_64-pc-windows-gnu.dependencies.image]
 git = "https://github.com/PistonDevelopers/image.git"
