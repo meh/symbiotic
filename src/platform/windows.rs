@@ -100,7 +100,6 @@ mod lib {
 	use std::ffi::c_str_to_bytes;
 	use std::ffi::CString;
 
-	use std::old_io::ByRefWriter;
 	use std::num::SignedInt;
 
 	use std::ptr;
@@ -495,7 +494,7 @@ mod lib {
 			let handle = match &name[] {
 				n if n.starts_with("text/") => {
 					if data.iter().any(|x| *x == 0) {
-						if unicode::str::is_utf16(unsafe { slice::from_raw_parts(&(data.as_ptr() as *const u16), data.len() / 2) }) {
+						if unicode::str::is_utf16(unsafe { slice::from_raw_parts(data.as_ptr() as *const u16, data.len() / 2) }) {
 							debug!("input: {}: utf16", name);
 
 							unsafe {
@@ -602,7 +601,7 @@ mod lib {
 						{
 							let lock = handle.lock();
 							let ptr  = (*(*lock as *mut BITMAPINFO)).bmiColors.as_mut_ptr();
-							let data = slice::from_raw_mut_buf::<RGBQUAD>(&ptr, width * height);
+							let data = slice::from_raw_parts_mut::<RGBQUAD>(ptr, width * height);
 
 							for (i, &Rgba([r, g, b, a])) in image.to_rgba().pixels().enumerate() {
 								data[i].rgbBlue     = b;
@@ -653,7 +652,7 @@ mod lib {
 							result.insert("text/plain".to_string(),
 								String::from_utf16(
 									slice::from_raw_parts(
-										&(*lock as *const u16), strlen(*lock))).unwrap().as_bytes().to_vec());
+										*lock as *const u16, strlen(*lock))).unwrap().as_bytes().to_vec());
 						},
 
 						"CF_DIB" => {
@@ -687,19 +686,19 @@ mod lib {
 
 							let mut data: Vec<u8> = vec!();
 
-							if let Ok(..) = ImageRgba8(buf).save(data.by_ref(), image::PNG) {
+							if let Ok(..) = ImageRgba8(buf).save(&mut data, image::PNG) {
 								result.insert("image/png".to_string(), data);
 							}
 						},
 
 						name if name.starts_with("text/") => {
 							result.insert(name.to_string(),
-								slice::from_raw_parts(&(*lock as *const u8), strlen(*lock) * 2).to_vec());
+								slice::from_raw_parts(*lock as *const u8, strlen(*lock) * 2).to_vec());
 						},
 
 						name if regex!(r"^(.*?)/(.*?)$").is_match(name) => {
 							result.insert(name.to_string(),
-								slice::from_raw_parts(&(*lock as *const u8), handle.size()).to_vec());
+								slice::from_raw_parts(*lock as *const u8, handle.size()).to_vec());
 						},
 
 						name => {
