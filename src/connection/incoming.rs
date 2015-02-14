@@ -83,6 +83,8 @@ pub fn start(channel: Sender<clipboard::Message>, host: Peer, peers: Vec<Peer>) 
 				continue;
 			}
 
+			debug!("server: peer not found: {}", conn.peer_name().unwrap().ip);
+
 			let peer    = peer.unwrap().clone();
 			let host    = host.clone();
 			let channel = channel.clone();
