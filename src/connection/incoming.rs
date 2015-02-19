@@ -19,7 +19,7 @@ extern crate openssl;
 extern crate protobuf;
 
 use std::sync::Arc;
-use std::thread::Thread;
+use std::thread::spawn;
 use std::sync::mpsc::Sender;
 
 use std::old_io::TcpListener;
@@ -66,7 +66,7 @@ fn verify(msg: &protocol::handshake::Identity) -> bool {
 }
 
 pub fn start(channel: Sender<clipboard::Message>, host: Peer, peers: Vec<Peer>) {
-	Thread::spawn(move || -> () {
+	spawn(move || -> () {
 		let     listener = TcpListener::bind((&host.ip[], host.port));
 		let mut acceptor = listener.listen();
 
@@ -89,7 +89,7 @@ pub fn start(channel: Sender<clipboard::Message>, host: Peer, peers: Vec<Peer>) 
 			let host    = host.clone();
 			let channel = channel.clone();
 
-			Thread::spawn(move || -> () {
+			spawn(move || -> () {
 				debug!("server: connected");
 
 				let mut ctx = SslContext::new(Sslv23).unwrap();

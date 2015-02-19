@@ -18,7 +18,7 @@
 extern crate openssl;
 extern crate protobuf;
 
-use std::thread::Thread;
+use std::thread::spawn;
 use std::sync::mpsc::{Sender, channel};
 
 use std::old_io::TcpStream;
@@ -52,7 +52,7 @@ fn identity() -> protocol::handshake::Identity {
 pub fn start(peer: Peer) -> Sender<clipboard::Change> {
 	let (sender, receiver) = channel::<clipboard::Change>();
 
-	Thread::spawn(move || -> () {
+	spawn(move || -> () {
 		loop {
 			let mut conn;
 

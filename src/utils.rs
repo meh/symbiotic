@@ -19,7 +19,7 @@ use std::sync::mpsc::Receiver;
 use std::hash::{self, SipHasher};
 use std::collections::BTreeMap;
 
-pub fn flush<T: Send>(channel: &Receiver<T>) -> Option<T> {
+pub fn flush<T: Send + 'static>(channel: &Receiver<T>) -> Option<T> {
 	if let Ok(v) = channel.try_recv() {
 		let mut value = v;
 

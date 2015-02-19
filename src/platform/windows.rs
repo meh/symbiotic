@@ -17,7 +17,7 @@
 
 extern crate toml;
 
-use std::thread::Thread;
+use std::thread::spawn;
 use std::sync::mpsc::{Sender, channel};
 use std::sync::Arc;
 
@@ -32,7 +32,7 @@ use utils;
 pub fn start(main: Sender<clipboard::Message>, _: Option<toml::Value>) -> Sender<clipboard::Change> {
 	let (sender, receiver) = channel::<clipboard::Change>();
 
-	Thread::spawn(move || -> () {
+	spawn(move || -> () {
 		let mut sequence = lib::sequence();
 		let mut previous = 0u64;
 

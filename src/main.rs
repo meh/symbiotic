@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-#![feature(plugin, core, collections, alloc, path, io, std_misc, libc, hash, unicode, link_args)]
+#![feature(plugin, core, collections, alloc, std_misc, libc, hash, unicode, link_args, old_io, old_path)]
 #![plugin(docopt_macros, regex_macros)]
 #![allow(unused_features)]
 

@@ -51,7 +51,7 @@ pub fn start(channel: Sender<clipboard::Message>, specs: Option<toml::Value>) ->
 mod lib {
 	extern crate regex;
 
-	use std::thread::Thread;
+	use std::thread::spawn;
 	use std::sync::Arc;
 	use std::sync::mpsc::{Sender, Receiver, channel};
 	use std::cell::Cell;
@@ -98,7 +98,7 @@ mod lib {
 		pub fn start(main: Sender<clipboard::Message>, display: Option<String>, mode: Mode) -> Sender<clipboard::Change> {
 			let (sender, receiver) = channel::<clipboard::Change>();
 
-			Thread::spawn(move || -> () {
+			spawn(move || -> () {
 				let display = x::Display::open(display.as_ref()).unwrap();
 				let manager = Manager::new(main, display, mode);
 
