@@ -15,13 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-extern crate toml;
-
+use toml;
 use std::sync::mpsc::Sender;
 
 use clipboard;
 
-#[derive(Eq, PartialEq, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Mode {
 	Selection,
 	Clipboard,
@@ -49,20 +48,18 @@ pub fn start(channel: Sender<clipboard::Message>, specs: Option<toml::Value>) ->
 }
 
 mod lib {
-	extern crate regex;
-
 	use std::thread::spawn;
 	use std::sync::Arc;
 	use std::sync::mpsc::{Sender, Receiver, channel};
 	use std::cell::Cell;
+	use regex::Regex;
 
-	use std::old_io::timer::sleep;
-	use std::time::duration::Duration;
+	use std::time::Duration;
+	use std::thread;
 
 	use std::collections::BTreeMap;
-	use std::default::Default;
 
-	use utils;
+	use util;
 
 	use clipboard;
 	use clipboard::Direction::Outgoing;
@@ -109,7 +106,7 @@ mod lib {
 						}
 
 						// this could be reduced a bit, but unsure about it
-						sleep(Duration::seconds(1));
+						thread::sleep(Duration::from_secs(1));
 					}
 				}
 			});
@@ -145,7 +142,7 @@ mod lib {
 		pub fn serve(&self, receiver: &Receiver<clipboard::Change>) -> Option<clipboard::Change> {
 			let mut change;
 
-			if let Some(c) = utils::flush(receiver) {
+			if let Some(c) = util::flush(receiver) {
 				let clipboard = self.intern("CLIPBOARD");
 
 				self.window.own_selection(match self.mode {
@@ -167,16 +164,16 @@ mod lib {
 							if details.selection != clipboard {
 								self.window.disown_selection(self.intern("CLIPBOARD"));
 
-								return utils::flush(receiver);
+								return util::flush(receiver);
 							}
 						}
 						else {
-							return utils::flush(receiver);
+							return util::flush(receiver);
 						}
 					}
 
 					if let Some(details) = event.details::<x::SelectionRequest>() {
-						if let Some(c) = utils::flush(receiver) {
+						if let Some(c) = util::flush(receiver) {
 							change = c;
 						}
 
@@ -184,10 +181,10 @@ mod lib {
 						let timestamp = change.0;
 						let content   = change.1.clone().into_iter().collect::<BTreeMap<String, Vec<u8>>>();
 
-						match &name[] {
+						match &name[..] {
 							"TARGETS" => {
 								let mut targets: Vec<x::Atom> =
-									content.keys().map(|mime| self.intern(&mime[])).collect();
+									content.keys().map(|mime| self.intern(&mime)).collect();
 
 								if content.contains_key("text/plain") {
 									targets.push(self.intern("UTF8_STRING"));
@@ -197,11 +194,11 @@ mod lib {
 								targets.push(self.intern("TIMESTAMP"));
 
 								self.set(details, &targets);
-							},
+							}
 
 							"TIMESTAMP" => {
 								self.set(details, &vec![timestamp]);
-							},
+							}
 
 							"UTF8_STRING" | "STRING" => {
 								if let Some(value) = content.get("text/plain") {
@@ -210,16 +207,16 @@ mod lib {
 								else {
 									self.error(details);
 								}
-							},
+							}
 
-							name if regex!(r"^(.*?)/(.*?)$").is_match(name) => {
+							name if Regex::new(r"^(.*?)/(.*?)$").unwrap().is_match(name) => {
 								if let Some(value) = content.get(name) {
 									self.set(details, value);
 								}
 								else {
 									self.error(details);
 								}
-							},
+							}
 
 							_ => {
 								self.error(details);
@@ -234,14 +231,14 @@ mod lib {
 
 		fn set<T>(&self, details: &x::SelectionRequest, data: &Vec<T>) {
 			let window = self.display.window(details.requestor);
-			let kind   = match &self.atom(details.target)[] {
+			let kind   = match &self.atom(details.target)[..] {
 				"TARGETS" => self.intern("ATOM"),
 				name      => self.intern(name)
 			};
 
 			let mut event = self.display.event();
 			{
-				let notify = event.mut_details::<x::SelectionNotify>();
+				let notify = event.details_mut::<x::SelectionNotify>();
 
 				notify.requestor = details.requestor;
 				notify.selection = details.selection;
@@ -259,7 +256,7 @@ mod lib {
 
 			let mut event = self.display.event();
 			{
-				let notify = event.mut_details::<x::SelectionNotify>();
+				let notify = event.details_mut::<x::SelectionNotify>();
 
 				notify.requestor = details.requestor;
 				notify.selection = details.selection;
@@ -303,14 +300,14 @@ mod lib {
 				for atom in property.items::<x::Atom>().unwrap() {
 					let name = self.atom(*atom);
 
-					if regex!(r"^(.*?)/(.*?)$").is_match(&name[]) {
-						if let Some(value) = self.get(&name[], selection) {
+					if Regex::new(r"^(.*?)/(.*?)$").unwrap().is_match(&name) {
+						if let Some(value) = self.get(&name, selection) {
 							if let Some(items) = value.items::<u8>() {
 								content.insert(name.clone(), items.to_vec());
 							}
 						}
 					}
-					else if "TIMESTAMP" == &name[] {
+					else if name == "TIMESTAMP" {
 						timestamp = self.get("TIMESTAMP", selection).unwrap().items::<u32>().unwrap()[0] as u64;
 					}
 				}
@@ -328,7 +325,7 @@ mod lib {
 				state.timestamp.set(timestamp);
 			}
 
-			let hash = utils::hash(&content);
+			let hash = util::hash(&content);
 
 			if hash == state.hash.get() {
 				return None;
@@ -369,21 +366,16 @@ mod lib {
 
 	#[allow(non_camel_case_types, non_upper_case_globals)]
 	mod x {
-		extern crate libc;
-
-		use self::libc::{c_void, c_int, c_uint, c_ulong, c_long, c_uchar};
+		use libc::{c_void, c_int, c_uint, c_ulong, c_long, c_uchar};
 		use std::collections::HashMap;
-
-		use std::ops::Drop;
 
 		use std::ptr;
 		use std::mem;
-		use std::intrinsics::type_id;
+		use std::any::{Any, TypeId};
 		use std::slice;
 		use std::cell::RefCell;
 
-		use std::ffi::c_str_to_bytes;
-		use std::ffi::CString;
+		use std::ffi::{CStr, CString};
 
 		pub type Id     = c_ulong;
 		pub type Atom   = c_ulong;
@@ -406,7 +398,7 @@ mod lib {
 			pub fake:    c_int,
 			pub display: *const c_void,
 
-			_data: [u64; 23us]
+			_data: [u64; 23]
 		}
 
 		#[repr(C)]
@@ -442,11 +434,11 @@ mod lib {
 				}
 			}
 
-			pub fn details<T>(&self) -> Option<&mut T> where T: 'static {
+			pub fn details<T: Any>(&self) -> Option<&T> {
 				unsafe {
-					if (self.kind == 31 && type_id::<T>() == type_id::<SelectionNotify>()) ||
-					   (self.kind == 30 && type_id::<T>() == type_id::<SelectionRequest>()) ||
-					   (self.kind == 29 && type_id::<T>() == type_id::<SelectionClear>())
+					if (self.kind == 31 && TypeId::of::<T>() == TypeId::of::<SelectionNotify>()) ||
+					   (self.kind == 30 && TypeId::of::<T>() == TypeId::of::<SelectionRequest>()) ||
+					   (self.kind == 29 && TypeId::of::<T>() == TypeId::of::<SelectionClear>())
 					{
 						Some(mem::transmute(&self._data))
 					}
@@ -456,13 +448,13 @@ mod lib {
 				}
 			}
 
-			pub fn mut_details<T>(&mut self) -> &mut T where T: 'static {
+			pub fn details_mut<T: Any>(&mut self) -> &mut T {
 				unsafe {
-					if type_id::<T>() == type_id::<SelectionNotify>() {
+					if TypeId::of::<T>() == TypeId::of::<SelectionNotify>() {
 						self.kind = 31;
 					}
 
-					mem::transmute(&self._data)
+					mem::transmute(&mut self._data)
 				}
 			}
 		}
@@ -535,26 +527,26 @@ mod lib {
 			id:      Id,
 		}
 
-		pub struct Property<'a> {
+		pub struct Property {
 			pub id:   Atom,
 			pub kind: Atom,
 
 			format: c_int,
 			items:  c_ulong,
-			data:   Vec<u8>,
+			data:   *const u8,
 		}
 
-		impl<'a> Property<'a> {
-			pub fn items<T>(&self) -> Option<&'a [T]> {
+		impl Property {
+			pub fn items<T>(&self) -> Option<&[T]> {
 				if self.format == (mem::size_of::<T>() * 8) as i32 {
 					return unsafe {
-						Some(slice::from_raw_parts(self.data.as_ptr() as *const T, self.items as usize))
+						Some(slice::from_raw_parts(self.data as *const T, self.items as usize))
 					}
 				}
 
 				if self.format == 32 && mem::size_of::<T>() == 8 {
 					return unsafe {
-						Some(slice::from_raw_parts(self.data.as_ptr() as *const T, (self.items / 2) as usize))
+						Some(slice::from_raw_parts(self.data as *const T, (self.items / 2) as usize))
 					}
 				}
 
@@ -562,10 +554,18 @@ mod lib {
 			}
 		}
 
+		impl Drop for Property {
+			fn drop(&mut self) {
+				unsafe {
+					XFree(self.data as *mut c_void);
+				}
+			}
+		}
+
 		impl Display {
 			pub fn open(name: Option<&String>) -> Option<Display> {
 				let pointer = if let Some(name) = name {
-					unsafe { XOpenDisplay(CString::from_slice(name.as_bytes()).as_ptr()) }
+					unsafe { XOpenDisplay(CString::new(name.as_bytes()).unwrap().as_ptr()) }
 				}
 				else {
 					unsafe { XOpenDisplay(ptr::null()) }
@@ -632,38 +632,38 @@ mod lib {
 					match name {
 						"PRIMARY" => {
 							1
-						},
+						}
 
 						"SECONDARY" => {
 							2
-						},
+						}
 
 						"ATOM" => {
 							4
-						},
+						}
 
 						"STRING" => {
 							31
-						},
+						}
 
 						"UTF8_STRING" => {
 							XmuInternAtom(self.pointer, _XA_UTF8_STRING)
-						},
+						}
 
 						"CLIPBOARD" => {
 							XmuInternAtom(self.pointer, _XA_CLIPBOARD)
-						},
+						}
 
 						"TIMESTAMP" => {
 							XmuInternAtom(self.pointer, _XA_TIMESTAMP)
-						},
+						}
 
 						"TARGETS" => {
 							XmuInternAtom(self.pointer, _XA_TARGETS)
-						},
+						}
 
 						_ => {
-							XInternAtom(self.pointer, CString::from_slice(name.as_bytes()).as_ptr(), False)
+							XInternAtom(self.pointer, CString::new(name.as_bytes()).unwrap().as_ptr(), False)
 						}
 					}
 				}
@@ -688,7 +688,7 @@ mod lib {
 
 				unsafe {
 					let buffer = XGetAtomName(self.pointer, id);
-					let result = String::from_utf8_lossy(c_str_to_bytes(&buffer)).into_owned();
+					let result = CStr::from_ptr(buffer).to_string_lossy().into_owned();
 
 					XFree(buffer as *mut c_void);
 
@@ -739,7 +739,6 @@ mod lib {
 					let mut format: c_int        = mem::uninitialized();
 					let mut items:  c_ulong      = mem::uninitialized();
 					let mut after:  c_ulong      = mem::uninitialized();
-					let     data:   Vec<u8>;
 
 					XGetWindowProperty(self.display, self.id, id, 0, XMaxRequestSize(self.display), False, 0, &mut kind, &mut format, &mut items, &mut after, &mut buffer);
 
@@ -747,16 +746,12 @@ mod lib {
 						return None;
 					}
 
-					data = Vec::from_raw_buf(buffer as *const u8, (items * ((format / 8) as c_ulong)) as usize);
-
-					XFree(buffer as *mut c_void);
-
 					Some(Property {
 						id:     id,
 						kind:   kind,
 						format: format,
 						items:  items,
-						data:   data
+						data:   buffer as *const u8,
 					})
 				}
 			}

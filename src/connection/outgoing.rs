@@ -15,27 +15,19 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-extern crate openssl;
-extern crate protobuf;
-
-use std::thread::spawn;
+use std::thread;
 use std::sync::mpsc::{Sender, channel};
+use std::net::TcpStream;
 
-use std::old_io::TcpStream;
+use openssl::ssl::SslMethod::Sslv23;
+use openssl::ssl::{SslContext, SslStream, SSL_VERIFY_PEER};
 
-use std::old_io::timer::sleep;
-use std::time::duration::Duration;
-
-use self::openssl::ssl::SslMethod::Sslv23;
-use self::openssl::ssl::{SslContext, SslStream};
-use self::openssl::ssl::SslVerifyMode::SslVerifyPeer;
-
-use self::protobuf::Message;
+use protobuf::Message;
 
 use protocol;
 use clipboard;
-use utils;
-use super::Peer;
+use util;
+use connection::Peer;
 
 fn identity() -> protocol::handshake::Identity {
 	let mut msg = protocol::handshake::Identity::new();
@@ -52,30 +44,21 @@ fn identity() -> protocol::handshake::Identity {
 pub fn start(peer: Peer) -> Sender<clipboard::Change> {
 	let (sender, receiver) = channel::<clipboard::Change>();
 
-	spawn(move || -> () {
+	thread::spawn(move || {
 		loop {
-			let mut conn;
-
-			if let Ok(c) = TcpStream::connect((&peer.ip[], peer.port)) {
-				conn = c;
-			}
-			else {
-				sleep(Duration::seconds(1));
-				continue
-			}
+			let conn = wait!(TcpStream::connect((&peer.ip[..], peer.port)));
 
 			debug!("client: connected");
 
 			let mut ctx = SslContext::new(Sslv23).unwrap();
-
-			ctx.set_cipher_list("DEFAULT");
+			ctx.set_cipher_list("DEFAULT").unwrap();
 
 			if let Some(ref cert) = peer.cert {
-				ctx.set_verify(SslVerifyPeer, None);
-				ctx.set_CA_file(cert);
+				ctx.set_verify(SSL_VERIFY_PEER, None);
+				ctx.set_CA_file(cert).unwrap();
 			}
 
-			let mut conn = SslStream::new(&ctx, conn).unwrap();
+			let mut conn = SslStream::connect(&ctx, conn).unwrap();
 
 			debug!("client: sending handshake");
 
@@ -85,7 +68,7 @@ pub fn start(peer: Peer) -> Sender<clipboard::Change> {
 
 			debug!("client: sent handshake: {:?}", identity());
 
-			utils::flush(&receiver);
+			util::flush(&receiver);
 
 			loop {
 				debug!("client: waiting for message");

@@ -16,20 +16,17 @@
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
 use std::sync::mpsc::{Sender, SendError};
-use std::default::Default;
+use std::path::PathBuf;
 
 use clipboard;
-
-mod incoming;
-mod outgoing;
 
 #[derive(Clone)]
 pub struct Peer {
 	pub ip:   String,
 	pub port: u16,
 
-	pub cert: Option<Path>,
-	pub key:  Option<Path>,
+	pub cert: Option<PathBuf>,
+	pub key:  Option<PathBuf>,
 }
 
 impl Default for Peer {
@@ -50,7 +47,7 @@ impl Broadcast {
 	pub fn send(&self, change: clipboard::Change) -> Result<(), SendError<clipboard::Change>> {
 		debug!("broadcast: {:?}", change);
 
-		for chan in self.0.iter() {
+		for chan in &self.0 {
 			try!(chan.send(change.clone()));
 		}
 
@@ -69,3 +66,7 @@ pub fn start(main: Sender<clipboard::Message>, host: Peer, peers: Vec<Peer>) -> 
 
 	Broadcast(broadcast)
 }
+
+mod incoming;
+
+mod outgoing;

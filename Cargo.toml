@@ -4,27 +4,22 @@ version = "0.1.0"
 authors = ["meh. <meh@schizofreni.co>"]
 
 [dependencies]
-regex        = "*"
-regex_macros = "*"
+libc = "0.2"
 
-log        = "*"
-env_logger = "*"
+regex   = "0.1"
+toml    = "0.1"
+tempdir = "0.3"
 
-docopt          = "*"
-docopt_macros   = "*"
-rustc-serialize = "*"
+log        = "0.3"
+env_logger = "0.3"
 
-toml    = "*"
-openssl = "*"
+clap    = "2.0"
 
-[dependencies.protobuf]
-git = "https://github.com/stepancheg/rust-protobuf.git"
+openssl  = "0.7"
+protobuf = "1.0"
 
-[target.x86_64-pc-windows-gnu.dependencies.image]
-git = "https://github.com/PistonDevelopers/image.git"
-
-[target.i686-pc-windows-gnu.dependencies.image]
-git = "https://github.com/PistonDevelopers/image.git"
+[target.'cfg(target_os = "windows")'.dependencies]
+image = "0.10"
 
 [[bin]]
 name = "symbiotic-clipboard"

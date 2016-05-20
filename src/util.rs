@@ -15,8 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::{self, Read};
+use std::path::Path;
+use std::fs::File;
 use std::sync::mpsc::Receiver;
-use std::hash::{self, SipHasher};
+use std::hash::{Hash, Hasher, SipHasher};
 use std::collections::BTreeMap;
 
 pub fn flush<T: Send + 'static>(channel: &Receiver<T>) -> Option<T> {
@@ -38,11 +41,34 @@ pub fn flush<T: Send + 'static>(channel: &Receiver<T>) -> Option<T> {
 }
 
 pub fn hash(content: &BTreeMap<String, Vec<u8>>) -> u64 {
-	let mut hash: u64 = 0;
+	let mut hasher = SipHasher::new();
+	let mut hash   = 0;
 
 	for (ref key, ref value) in content {
-		hash = hash::hash::<_, SipHasher>(&(hash, key, value));
+		&(hash, key, value).hash(&mut hasher);
+		hash = hasher.finish();
 	}
 
 	hash
+}
+
+macro_rules! wait {
+	($body:expr) => (
+		if let Ok(value) = $body {
+			value
+		}
+		else {
+			::std::thread::sleep(::std::time::Duration::from_secs(1));
+			continue;
+		}
+	);
+}
+
+pub fn file_contents<P: AsRef<Path>>(path: P) -> io::Result<String> {
+	let mut file    = try!(File::open(path));
+	let mut content = String::new();
+
+	try!(file.read_to_string(&mut content));
+
+	Ok(content)
 }

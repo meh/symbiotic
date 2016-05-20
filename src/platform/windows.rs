@@ -316,7 +316,7 @@ mod lib {
 				let height = info.biHeight;
 				let bits   = info.biBitCount as i32;
 
-				let limit   = ((((width * bits) + 31) as usize) & !31us) >> 3;
+				let limit   = ((((width * bits) + 31) as usize) & !31) >> 3;
 				let padding = limit - ((width * (bits / 8)) as usize);
 
 				Pixels {
@@ -480,7 +480,7 @@ mod lib {
 		}
 
 		pub fn set(&self, name: &String, data: &Vec<u8>) {
-			let format = match &name[] {
+			let format = match &name {
 				"text/plain" =>
 					CF_UNICODETEXT,
 
@@ -491,7 +491,7 @@ mod lib {
 					self.register(n)
 			};
 
-			let handle = match &name[] {
+			let handle = match &name {
 				n if n.starts_with("text/") => {
 					if data.iter().any(|x| *x == 0) {
 						if unicode::str::is_utf16(unsafe { slice::from_raw_parts(data.as_ptr() as *const u16, data.len() / 2) }) {
@@ -501,7 +501,7 @@ mod lib {
 								let handle = Global::new(data.len() + 2);
 								let lock   = handle.lock();
 
-								ptr::copy_memory(*lock as *mut u8, (&data[]).as_ptr(), data.len());
+								ptr::copy_memory(*lock as *mut u8, data.as_ptr(), data.len());
 
 								handle
 							}
@@ -513,14 +513,14 @@ mod lib {
 								let handle = Global::new(data.len() + 4);
 								let lock   = handle.lock();
 
-								ptr::copy_memory(*lock as *mut u8, (&data[]).as_ptr(), data.len());
+								ptr::copy_memory(*lock as *mut u8, data.as_ptr(), data.len());
 
 								handle
 							}
 						}
 					}
 					else {
-						if let Ok(string) = str::from_utf8(&data[]) {
+						if let Ok(string) = str::from_utf8(&data) {
 							debug!("input: {}: utf8", name);
 
 							let data = string.utf16_units().collect::<Vec<u16>>();
@@ -529,7 +529,7 @@ mod lib {
 								let handle = Global::new(data.len() * 2 + 2);
 								let lock   = handle.lock();
 
-								ptr::copy_memory(*lock as *mut u16, (&data[]).as_ptr(), data.len());
+								ptr::copy_memory(*lock as *mut u16, data.as_ptr(), data.len());
 
 								handle
 							}
@@ -541,16 +541,16 @@ mod lib {
 								let handle = Global::new(data.len() + 1);
 								let lock   = handle.lock();
 
-								ptr::copy_memory(*lock as *mut u8, (&data[]).as_ptr(), data.len());
+								ptr::copy_memory(*lock as *mut u8, data.as_ptr(), data.len());
 
 								handle
 							}
 						}
 					}
-				},
+				}
 
 				n if n.starts_with("image/") => {
-					let format = match &n[] {
+					let format = match &n {
 						"image/png"   => ImageFormat::PNG,
 						"image/jpeg"  => ImageFormat::JPEG,
 						"image/gif"   => ImageFormat::GIF,
@@ -561,7 +561,7 @@ mod lib {
 						_ => return
 					};
 
-					let image = image::load_from_memory_with_format(&data[], format);
+					let image = image::load_from_memory_with_format(&data, format);
 
 					if image.is_err() {
 						return;
@@ -613,14 +613,14 @@ mod lib {
 
 						handle
 					}
-				},
+				}
 
 				_ => {
 					unsafe {
 						let handle = Global::new(data.len());
 						let lock   = handle.lock();
 
-						ptr::copy_memory(*lock as *mut u8, (&data[]).as_ptr() as *mut u8, data.len());
+						ptr::copy_memory(*lock as *mut u8, data.as_ptr() as *mut u8, data.len());
 
 						handle
 					}
@@ -647,7 +647,7 @@ mod lib {
 
 					let lock = handle.lock();
 
-					match &self.name(format)[] {
+					match &self.name(format) {
 						"CF_UNICODETEXT" => {
 							result.insert("text/plain".to_string(),
 								String::from_utf16(
@@ -696,7 +696,7 @@ mod lib {
 								slice::from_raw_parts(*lock as *const u8, strlen(*lock) * 2).to_vec());
 						},
 
-						name if regex!(r"^(.*?)/(.*?)$").is_match(name) => {
+						name if Regex::new(r"^(.*?)/(.*?)$").is_match(name) => {
 							result.insert(name.to_string(),
 								slice::from_raw_parts(*lock as *const u8, handle.size()).to_vec());
 						},

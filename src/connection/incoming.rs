@@ -15,28 +15,24 @@
 // You should have received a copy of the GNU General Public License
 // along with symbiotic. If not, see <http://www.gnu.org/licenses/>.
 
-extern crate openssl;
-extern crate protobuf;
-
 use std::sync::Arc;
-use std::thread::spawn;
+use std::thread;
 use std::sync::mpsc::Sender;
 
-use std::old_io::TcpListener;
-use std::old_io::{Acceptor, Listener};
-use std::old_io::{File, Open, Write};
-use std::old_io::TempDir;
+use std::fs::File;
+use tempdir::TempDir;
 
-use self::openssl::ssl::SslMethod::Sslv23;
-use self::openssl::ssl::{SslContext, SslStream};
-use self::openssl::ssl::SslVerifyMode::{SslVerifyNone, SslVerifyPeer};
-use self::openssl::x509::{X509FileType, X509Generator};
-use self::openssl::x509::KeyUsage::DigitalSignature;
-use self::openssl::crypto::hash::Type::SHA256;
+use std::net::TcpListener;
+
+use openssl::ssl::SslMethod::Sslv23;
+use openssl::ssl::{SslContext, SslStream, SSL_VERIFY_NONE, SSL_VERIFY_PEER};
+use openssl::x509::{X509FileType, X509Generator};
+use openssl::x509::extension::Extension::{KeyUsage};
+use openssl::x509::extension::KeyUsageOption::DigitalSignature;
+use openssl::crypto::hash::Type::SHA256;
 
 use protocol;
 
-use protobuf::Message;
 use protobuf::core::parse_length_delimited_from;
 use protobuf::stream::{CodedInputStream};
 
@@ -46,7 +42,7 @@ use clipboard::Direction::Incoming;
 use super::Peer;
 
 fn verify(msg: &protocol::handshake::Identity) -> bool {
-	if &msg.get_name()[] != "clipboard" {
+	if msg.get_name() != "clipboard" {
 		return false;
 	}
 
@@ -66,78 +62,80 @@ fn verify(msg: &protocol::handshake::Identity) -> bool {
 }
 
 pub fn start(channel: Sender<clipboard::Message>, host: Peer, peers: Vec<Peer>) {
-	spawn(move || -> () {
-		let     listener = TcpListener::bind((&host.ip[], host.port));
-		let mut acceptor = listener.listen();
+	thread::spawn(move || {
+		let listener = TcpListener::bind((&host.ip[..], host.port)).unwrap();
 
-		for conn in acceptor.incoming() {
+		for conn in listener.incoming() {
 			if conn.is_err() {
 				continue;
 			}
 
-			let mut conn = conn.unwrap();
-			let     peer = peers.iter().find(|p|
-				p.ip == format!("{}", conn.peer_name().unwrap().ip));
+			let conn = conn.unwrap();
+			let addr = conn.peer_addr().unwrap();
+			let peer = peers.iter().find(|p| p.ip == format!("{}", addr.ip()));
 
 			if peer.is_none() {
+				debug!("server: peer not found: {}", addr.ip());
 				continue;
 			}
-
-			debug!("server: peer not found: {}", conn.peer_name().unwrap().ip);
 
 			let peer    = peer.unwrap().clone();
 			let host    = host.clone();
 			let channel = channel.clone();
 
-			spawn(move || -> () {
+			thread::spawn(move || {
 				debug!("server: connected");
 
 				let mut ctx = SslContext::new(Sslv23).unwrap();
 
-				ctx.set_cipher_list("DEFAULT");
+				ctx.set_cipher_list("DEFAULT").unwrap();
 
 				if let Some(ref cert) = host.cert {
-					ctx.set_certificate_file(cert, X509FileType::PEM);
-					ctx.set_private_key_file(&host.key.unwrap(), X509FileType::PEM);
+					ctx.set_certificate_file(cert, X509FileType::PEM).unwrap();
+					ctx.set_private_key_file(&host.key.unwrap(), X509FileType::PEM).unwrap();
 				}
 				else {
 					let gen = X509Generator::new()
-			 	 	          .set_bitlength(2048)
-			 	 	          .set_valid_period(365*2)
-			 	 	          .set_CN("Symbiote Inc.")
-			 	 	          .set_sign_hash(SHA256)
-			 	 	          .set_usage(&[DigitalSignature]);
+			 	 		.set_bitlength(2048)
+			 	 		.set_valid_period(365 * 2)
+			 	 		.add_name("CN".into(), "Symbiote Inc.".into())
+			 	 		.set_sign_hash(SHA256)
+			 	 		.add_extension(KeyUsage(vec![DigitalSignature]));
 
 					let (cert, key) = gen.generate().unwrap();
 
 					let dir  = TempDir::new("symbiotic").unwrap();
-					let path = dir.into_inner();
+					let path = dir.into_path();
 
 					let mut cert_path = path.clone();
 					        cert_path.push("cert.pem");
 
-					let mut file = File::open_mode(&cert_path, Open, Write).unwrap();
-					cert.write_pem(&mut file).unwrap();
+					{
+						let mut file = File::open(&cert_path).unwrap();
+						cert.write_pem(&mut file).unwrap();
+					}
 
 					let mut key_path = path.clone();
 					        key_path.push("key.pem");
 
-					let mut file = File::open_mode(&key_path, Open, Write).unwrap();
-					key.write_pem(&mut file).unwrap();
+					{
+						let mut file = File::open(&key_path).unwrap();
+						key.write_pem(&mut file).unwrap();
+					}
 
-					ctx.set_certificate_file(&cert_path, X509FileType::PEM);
-					ctx.set_private_key_file(&key_path, X509FileType::PEM);
+					ctx.set_certificate_file(&cert_path, X509FileType::PEM).unwrap();
+					ctx.set_private_key_file(&key_path, X509FileType::PEM).unwrap();
 				}
 
 				if let Some(ref cert) = peer.cert {
-					ctx.set_verify(SslVerifyPeer, None);
-					ctx.set_CA_file(cert);
+					ctx.set_verify(SSL_VERIFY_PEER, None);
+					ctx.set_CA_file(cert).unwrap();
 				}
 				else {
-					ctx.set_verify(SslVerifyNone, None);
+					ctx.set_verify(SSL_VERIFY_NONE, None);
 				}
 
-				let mut conn = SslStream::new_server(&ctx, conn).unwrap();
+				let mut conn = SslStream::accept(&ctx, conn).unwrap();
 				let mut conn = CodedInputStream::new(&mut conn);
 
 				debug!("server: fo shizzle");

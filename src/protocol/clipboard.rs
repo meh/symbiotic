@@ -1,7 +1,15 @@
 // This file is generated. Do not edit
+// @generated
+
+// https://github.com/Manishearth/rust-clippy/issues/702
+#![allow(unknown_lints)]
+#![allow(clippy)]
+
+#![cfg_attr(rustfmt, rustfmt_skip)]
 
 #![allow(dead_code)]
 #![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(unused_imports)]
 
@@ -10,11 +18,16 @@ use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 
 #[derive(Clone,Default)]
 pub struct Content {
+    // message fields
     format: ::protobuf::SingularField<::std::string::String>,
     data: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    // special fields
     unknown_fields: ::protobuf::UnknownFields,
     cached_size: ::std::cell::Cell<u32>,
 }
+
+// see codegen.rs for the explanation why impl Sync explicitly
+unsafe impl ::std::marker::Sync for Content {}
 
 impl Content {
     pub fn new() -> Content {
@@ -55,7 +68,7 @@ impl Content {
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_format<'a>(&'a mut self) -> &'a mut ::std::string::String {
+    pub fn mut_format(&mut self) -> &mut ::std::string::String {
         if self.format.is_none() {
             self.format.set_default();
         };
@@ -67,9 +80,9 @@ impl Content {
         self.format.take().unwrap_or_else(|| ::std::string::String::new())
     }
 
-    pub fn get_format<'a>(&'a self) -> &'a str {
+    pub fn get_format(&self) -> &str {
         match self.format.as_ref() {
-            Some(v) => v.as_slice(),
+            Some(v) => &v,
             None => "",
         }
     }
@@ -91,7 +104,7 @@ impl Content {
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_data<'a>(&'a mut self) -> &'a mut ::std::vec::Vec<u8> {
+    pub fn mut_data(&mut self) -> &mut ::std::vec::Vec<u8> {
         if self.data.is_none() {
             self.data.set_default();
         };
@@ -103,10 +116,10 @@ impl Content {
         self.data.take().unwrap_or_else(|| ::std::vec::Vec::new())
     }
 
-    pub fn get_data<'a>(&'a self) -> &'a [u8] {
+    pub fn get_data(&self) -> &[u8] {
         match self.data.as_ref() {
-            Some(v) => v.as_slice(),
-            None => [].as_slice(),
+            Some(v) => &v,
+            None => &[],
         }
     }
 }
@@ -127,22 +140,13 @@ impl ::protobuf::Message for Content {
             let (field_number, wire_type) = try!(is.read_tag_unpack());
             match field_number {
                 1 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
-                    };
-                    let tmp = self.format.set_default();
-                    try!(is.read_string_into(tmp))
+                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.format));
                 },
                 2 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
-                    };
-                    let tmp = self.data.set_default();
-                    try!(is.read_bytes_into(tmp))
+                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.data));
                 },
                 _ => {
-                    let unknown = try!(is.read_unknown(wire_type));
-                    self.mut_unknown_fields().add_value(field_number, unknown);
+                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
                 },
             };
         }
@@ -150,13 +154,14 @@ impl ::protobuf::Message for Content {
     }
 
     // Compute sizes of nested messages
+    #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
         for value in self.format.iter() {
-            my_size += ::protobuf::rt::string_size(1, value.as_slice());
+            my_size += ::protobuf::rt::string_size(1, &value);
         };
         for value in self.data.iter() {
-            my_size += ::protobuf::rt::bytes_size(2, value.as_slice());
+            my_size += ::protobuf::rt::bytes_size(2, &value);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -165,10 +170,10 @@ impl ::protobuf::Message for Content {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.format.as_ref() {
-            try!(os.write_string(1, v.as_slice()));
+            try!(os.write_string(1, &v));
         };
         if let Some(v) = self.data.as_ref() {
-            try!(os.write_bytes(2, v.as_slice()));
+            try!(os.write_bytes(2, &v));
         };
         try!(os.write_unknown_fields(self.get_unknown_fields()));
         ::std::result::Result::Ok(())
@@ -178,16 +183,20 @@ impl ::protobuf::Message for Content {
         self.cached_size.get()
     }
 
-    fn get_unknown_fields<'s>(&'s self) -> &'s ::protobuf::UnknownFields {
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
         &self.unknown_fields
     }
 
-    fn mut_unknown_fields<'s>(&'s mut self) -> &'s mut ::protobuf::UnknownFields {
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
     }
 
     fn type_id(&self) -> ::std::any::TypeId {
         ::std::any::TypeId::of::<Content>()
+    }
+
+    fn as_any(&self) -> &::std::any::Any {
+        self as &::std::any::Any
     }
 
     fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
@@ -200,7 +209,6 @@ impl ::protobuf::MessageStatic for Content {
         Content::new()
     }
 
-    #[allow(unused_unsafe,unused_mut)]
     fn descriptor_static(_: ::std::option::Option<Content>) -> &'static ::protobuf::reflect::MessageDescriptor {
         static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
             lock: ::protobuf::lazy::ONCE_INIT,
@@ -253,11 +261,16 @@ impl ::std::fmt::Debug for Content {
 
 #[derive(Clone,Default)]
 pub struct Change {
+    // message fields
     at: ::std::option::Option<u64>,
     content: ::protobuf::RepeatedField<Content>,
+    // special fields
     unknown_fields: ::protobuf::UnknownFields,
     cached_size: ::std::cell::Cell<u32>,
 }
+
+// see codegen.rs for the explanation why impl Sync explicitly
+unsafe impl ::std::marker::Sync for Change {}
 
 impl Change {
     pub fn new() -> Change {
@@ -296,7 +309,7 @@ impl Change {
         self.at = ::std::option::Option::Some(v);
     }
 
-    pub fn get_at<'a>(&self) -> u64 {
+    pub fn get_at(&self) -> u64 {
         self.at.unwrap_or(0)
     }
 
@@ -312,7 +325,7 @@ impl Change {
     }
 
     // Mutable pointer to the field.
-    pub fn mut_content<'a>(&'a mut self) -> &'a mut ::protobuf::RepeatedField<Content> {
+    pub fn mut_content(&mut self) -> &mut ::protobuf::RepeatedField<Content> {
         &mut self.content
     }
 
@@ -321,8 +334,8 @@ impl Change {
         ::std::mem::replace(&mut self.content, ::protobuf::RepeatedField::new())
     }
 
-    pub fn get_content<'a>(&'a self) -> &'a [Content] {
-        self.content.as_slice()
+    pub fn get_content(&self) -> &[Content] {
+        &self.content
     }
 }
 
@@ -337,7 +350,7 @@ impl ::protobuf::Message for Change {
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::ProtobufError::WireError("unexpected wire type".to_string()));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
                     let tmp = try!(is.read_uint64());
                     self.at = ::std::option::Option::Some(tmp);
@@ -346,8 +359,7 @@ impl ::protobuf::Message for Change {
                     try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.content));
                 },
                 _ => {
-                    let unknown = try!(is.read_unknown(wire_type));
-                    self.mut_unknown_fields().add_value(field_number, unknown);
+                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
                 },
             };
         }
@@ -355,6 +367,7 @@ impl ::protobuf::Message for Change {
     }
 
     // Compute sizes of nested messages
+    #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
         for value in self.at.iter() {
@@ -386,16 +399,20 @@ impl ::protobuf::Message for Change {
         self.cached_size.get()
     }
 
-    fn get_unknown_fields<'s>(&'s self) -> &'s ::protobuf::UnknownFields {
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
         &self.unknown_fields
     }
 
-    fn mut_unknown_fields<'s>(&'s mut self) -> &'s mut ::protobuf::UnknownFields {
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
     }
 
     fn type_id(&self) -> ::std::any::TypeId {
         ::std::any::TypeId::of::<Change>()
+    }
+
+    fn as_any(&self) -> &::std::any::Any {
+        self as &::std::any::Any
     }
 
     fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
@@ -408,7 +425,6 @@ impl ::protobuf::MessageStatic for Change {
         Change::new()
     }
 
-    #[allow(unused_unsafe,unused_mut)]
     fn descriptor_static(_: ::std::option::Option<Change>) -> &'static ::protobuf::reflect::MessageDescriptor {
         static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
             lock: ::protobuf::lazy::ONCE_INIT,
